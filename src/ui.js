@@ -85,17 +85,33 @@ class GameHUD {
         }).setOrigin(1, 0);
         this.container.add(this.timerText);
         
-        // Essence counter (top center)
+        // XP Currency display (top center-left) - prominent!
+        this.xpCurrencyBg = this.scene.add.graphics();
+        this.xpCurrencyBg.fillStyle(0x004466, 0.8);
+        this.xpCurrencyBg.fillRoundedRect(width / 2 - 90, padding, 80, 28, 6);
+        this.xpCurrencyBg.lineStyle(2, 0x00aaff);
+        this.xpCurrencyBg.strokeRoundedRect(width / 2 - 90, padding, 80, 28, 6);
+        this.container.add(this.xpCurrencyBg);
+        
+        this.xpCurrencyText = this.scene.add.text(width / 2 - 50, padding + 14, '💎 0', {
+            fontFamily: 'Rubik, sans-serif',
+            fontSize: '14px',
+            fontWeight: '700',
+            color: '#00ffff'
+        }).setOrigin(0.5);
+        this.container.add(this.xpCurrencyText);
+        
+        // Essence counter (top center-right)
         this.essenceIcon = this.scene.add.graphics();
         this.essenceIcon.fillStyle(0xffdd00);
-        this.essenceIcon.fillCircle(width / 2 - 30, padding + 20, 10);
+        this.essenceIcon.fillCircle(width / 2 + 30, padding + 14, 8);
         this.essenceIcon.lineStyle(2, 0xaa8800);
-        this.essenceIcon.strokeCircle(width / 2 - 30, padding + 20, 10);
+        this.essenceIcon.strokeCircle(width / 2 + 30, padding + 14, 8);
         this.container.add(this.essenceIcon);
         
-        this.essenceText = this.scene.add.text(width / 2 - 15, padding + 20, '0', {
+        this.essenceText = this.scene.add.text(width / 2 + 45, padding + 14, '0', {
             fontFamily: 'Rubik, sans-serif',
-            fontSize: '18px',
+            fontSize: '14px',
             fontWeight: '700',
             color: '#ffdd00'
         }).setOrigin(0, 0.5);
@@ -145,30 +161,30 @@ class GameHUD {
         return container;
     }
     
-    update(player, wave, timer, essence, xp, level, xpToNext, stats) {
-        const width = this.scene.cameras.main.width;
-        const padding = 15;
+    update(player, wave, timer, essence, xp, level, xpToNext, stats, xpCurrency) {
+        var width = this.scene.cameras.main.width;
+        var padding = 15;
         
         // Update HP bar
-        const maxHp = stats?.maxHp || 100;
-        const hpPercent = Math.max(0, player.hp / maxHp);
-        const hpColor = hpPercent > 0.5 ? 0x44ff44 : hpPercent > 0.25 ? 0xffff44 : 0xff4444;
+        var maxHp = stats && stats.maxHp ? stats.maxHp : 100;
+        var hpPercent = Math.max(0, player.hp / maxHp);
+        var hpColor = hpPercent > 0.5 ? 0x44ff44 : hpPercent > 0.25 ? 0xffff44 : 0xff4444;
         
         this.hpBar.clear();
         this.hpBar.fillStyle(hpColor);
         this.hpBar.fillRoundedRect(padding + 2, padding + 2, 146 * hpPercent, 16, 3);
-        this.hpText.setText(`${Math.ceil(player.hp)}/${maxHp}`);
+        this.hpText.setText(Math.ceil(player.hp) + '/' + maxHp);
         
         // Update XP bar
-        const xpPercent = xpToNext > 0 ? xp / xpToNext : 0;
+        var xpPercent = xpToNext > 0 ? xp / xpToNext : 0;
         this.xpBar.clear();
         this.xpBar.fillStyle(0x8844ff);
         this.xpBar.fillRoundedRect(padding + 1, padding + 29, 148 * xpPercent, 10, 2);
-        this.levelText.setText(`Lv.${level}`);
+        this.levelText.setText('Lv.' + level);
         
         // Update wave & timer
-        this.waveText.setText(`WAVE ${wave}`);
-        this.timerText.setText(`${Math.ceil(timer)}s`);
+        this.waveText.setText('WAVE ' + wave);
+        this.timerText.setText(Math.ceil(timer) + 's');
         
         // Timer color
         if (timer <= 5) {
@@ -181,6 +197,10 @@ class GameHUD {
         
         // Update essence
         this.essenceText.setText(essence.toString());
+        
+        // Update XP currency (upgrade points)
+        var currency = xpCurrency || 0;
+        this.xpCurrencyText.setText('💎 ' + currency);
         
         // Update dash indicator
         this.updateDashIndicator(player, stats);
@@ -223,88 +243,115 @@ class GameHUD {
 }
 
 // ===================================
-// UPGRADE SELECTION UI
+// UPGRADE SELECTION UI (with XP Cost System)
 // ===================================
+
+// XP costs by rarity
+var UPGRADE_COSTS = {
+    'Common': 10,
+    'Rare': 20,
+    'Epic': 35
+};
+
+var REROLL_COST = 8;
 
 class UpgradeSelectionUI {
     constructor(scene) {
         this.scene = scene;
         this.container = null;
         this.selectedCallback = null;
+        this.gameScene = null; // Reference to game scene for XP
     }
     
-    show(choices, upgradeManager, callback) {
+    show(choices, upgradeManager, gameScene, callback) {
         this.selectedCallback = callback;
-        this.selectionMade = false; // Prevent double-selection
+        this.selectionMade = false;
+        this.gameScene = gameScene; // Store for XP access
+        this.upgradeManager = upgradeManager;
         
-        const width = this.scene.cameras.main.width;
-        const height = this.scene.cameras.main.height;
+        var width = this.scene.cameras.main.width;
+        var height = this.scene.cameras.main.height;
         
         this.container = this.scene.add.container(0, 0);
         this.container.setDepth(2000);
         this.container.setScrollFactor(0);
         
-        // Darkened background - NOT interactive so it won't block clicks
-        const overlay = this.scene.add.graphics();
+        // Darkened background
+        var overlay = this.scene.add.graphics();
         overlay.fillStyle(0x000000, 0.85);
         overlay.fillRect(0, 0, width, height);
         this.container.add(overlay);
         
-        // Debug text for selection feedback
-        this.debugSelectText = this.scene.add.text(width / 2, height - 40, '', {
-            fontFamily: 'monospace',
-            fontSize: '12px',
-            color: '#00ff00',
-            backgroundColor: '#000000'
-        }).setOrigin(0.5).setDepth(2001);
-        this.container.add(this.debugSelectText);
-        
         // Title
-        const title = this.scene.add.text(width / 2, 60, 'CHOOSE AN UPGRADE', {
+        var title = this.scene.add.text(width / 2, 40, 'CHOOSE AN UPGRADE', {
             fontFamily: 'Rubik, sans-serif',
-            fontSize: '28px',
+            fontSize: '24px',
             fontWeight: '800',
             color: '#ffffff'
         }).setOrigin(0.5);
         this.container.add(title);
         
-        // Subtitle
-        const subtitle = this.scene.add.text(width / 2, 95, 'Wave completed! Pick your reward.', {
-            fontFamily: 'Inter, sans-serif',
-            fontSize: '14px',
-            color: '#888888'
+        // XP Currency display
+        var currentXP = gameScene.xpCurrency || 0;
+        this.xpDisplay = this.scene.add.text(width / 2, 70, '💎 XP: ' + currentXP, {
+            fontFamily: 'Rubik, sans-serif',
+            fontSize: '18px',
+            fontWeight: '700',
+            color: '#00ffff'
         }).setOrigin(0.5);
-        this.container.add(subtitle);
+        this.container.add(this.xpDisplay);
         
-        // Cards
-        const cardWidth = Math.min(140, (width - 60) / 3);
-        const cardHeight = 200;
-        const cardSpacing = 15;
-        const totalWidth = choices.length * cardWidth + (choices.length - 1) * cardSpacing;
-        const startX = (width - totalWidth) / 2 + cardWidth / 2;
+        // Debug text
+        this.debugSelectText = this.scene.add.text(width / 2, height - 20, '', {
+            fontFamily: 'monospace',
+            fontSize: '10px',
+            color: '#00ff00'
+        }).setOrigin(0.5);
+        this.container.add(this.debugSelectText);
         
-        choices.forEach((upgrade, index) => {
-            const cardX = startX + index * (cardWidth + cardSpacing);
-            const cardY = height / 2 - 20;
-            
-            const card = this.createUpgradeCard(
-                cardX, cardY, cardWidth, cardHeight,
-                upgrade, upgradeManager, index
-            );
-            this.container.add(card);
+        // Filter valid choices (must have id and apply function)
+        var validChoices = choices.filter(function(u) {
+            return u && u.id && u.apply && typeof u.apply === 'function';
         });
         
-        // Reroll button (if available)
-        if (upgradeManager.canReroll()) {
-            const rerollBtn = this.createRerollButton(width / 2, height - 100, () => {
-                upgradeManager.useReroll();
-                this.hide();
-                // Get new choices and show again
-                const newChoices = upgradeManager.getRandomChoices(3);
-                this.show(newChoices, upgradeManager, callback);
-            });
-            this.container.add(rerollBtn);
+        // If not enough valid choices, get more
+        while (validChoices.length < 3) {
+            var moreChoices = upgradeManager.getRandomChoices(3);
+            for (var i = 0; i < moreChoices.length && validChoices.length < 3; i++) {
+                var c = moreChoices[i];
+                if (c && c.id && c.apply && !validChoices.find(function(v) { return v.id === c.id; })) {
+                    validChoices.push(c);
+                }
+            }
+            if (moreChoices.length === 0) break;
         }
+        
+        // Cards
+        var cardWidth = Math.min(120, (width - 40) / 3);
+        var cardHeight = 180;
+        var cardSpacing = 10;
+        var totalWidth = validChoices.length * cardWidth + (validChoices.length - 1) * cardSpacing;
+        var startX = (width - totalWidth) / 2 + cardWidth / 2;
+        
+        var self = this;
+        validChoices.forEach(function(upgrade, index) {
+            var cardX = startX + index * (cardWidth + cardSpacing);
+            var cardY = height / 2 - 30;
+            
+            var card = self.createUpgradeCard(
+                cardX, cardY, cardWidth, cardHeight,
+                upgrade, upgradeManager, index, currentXP
+            );
+            self.container.add(card);
+        });
+        
+        // Skip button (always available)
+        var skipBtn = this.createSkipButton(width / 2 - 80, height - 70);
+        this.container.add(skipBtn);
+        
+        // Reroll button (costs XP)
+        var rerollBtn = this.createRerollButton(width / 2 + 80, height - 70, currentXP);
+        this.container.add(rerollBtn);
         
         // Entrance animation
         this.container.alpha = 0;
@@ -315,169 +362,191 @@ class UpgradeSelectionUI {
         });
     }
     
-    createUpgradeCard(x, y, width, height, upgrade, upgradeManager, index) {
-        const container = this.scene.add.container(x, y);
+    createUpgradeCard(x, y, width, height, upgrade, upgradeManager, index, currentXP) {
+        var container = this.scene.add.container(x, y);
         
-        const currentLevel = upgradeManager.getUpgradeLevel(upgrade.id);
-        const isMaxed = currentLevel >= upgrade.maxLevel;
+        var currentLevel = upgradeManager.getUpgradeLevel(upgrade.id);
+        var isMaxed = currentLevel >= upgrade.maxLevel;
+        
+        // Calculate cost based on rarity
+        var cost = UPGRADE_COSTS[upgrade.rarity.name] || 10;
+        var canAfford = currentXP >= cost && !isMaxed;
         
         // Card background
-        const bg = this.scene.add.graphics();
-        bg.fillStyle(0x1a1a2e);
-        bg.fillRoundedRect(-width / 2, -height / 2, width, height, 12);
+        var bg = this.scene.add.graphics();
+        if (canAfford) {
+            bg.fillStyle(0x1a1a2e);
+        } else {
+            bg.fillStyle(0x111118); // Darker when can't afford
+        }
+        bg.fillRoundedRect(-width / 2, -height / 2, width, height, 10);
         
         // Rarity border
-        bg.lineStyle(3, upgrade.rarity.color);
-        bg.strokeRoundedRect(-width / 2, -height / 2, width, height, 12);
+        var borderColor = canAfford ? upgrade.rarity.color : 0x444444;
+        bg.lineStyle(2, borderColor);
+        bg.strokeRoundedRect(-width / 2, -height / 2, width, height, 10);
         
         // Top rarity glow
-        bg.fillStyle(upgrade.rarity.color, 0.2);
-        bg.fillRoundedRect(-width / 2 + 4, -height / 2 + 4, width - 8, 40, 8);
+        bg.fillStyle(upgrade.rarity.color, canAfford ? 0.2 : 0.1);
+        bg.fillRoundedRect(-width / 2 + 3, -height / 2 + 3, width - 6, 30, 6);
         
         container.add(bg);
         
         // Rarity label
-        const rarityLabel = this.scene.add.text(0, -height / 2 + 18, upgrade.rarity.name.toUpperCase(), {
+        var rarityLabel = this.scene.add.text(0, -height / 2 + 14, upgrade.rarity.name.toUpperCase(), {
             fontFamily: 'Inter, sans-serif',
-            fontSize: '10px',
+            fontSize: '9px',
             fontWeight: '600',
-            color: upgrade.rarity.colorHex
+            color: canAfford ? upgrade.rarity.colorHex : '#666666'
         }).setOrigin(0.5);
         container.add(rarityLabel);
         
         // Icon
-        const icon = this.scene.add.text(0, -height / 2 + 65, upgrade.icon, {
-            fontSize: '36px'
+        var icon = this.scene.add.text(0, -height / 2 + 50, upgrade.icon, {
+            fontSize: '28px'
         }).setOrigin(0.5);
+        if (!canAfford) icon.setAlpha(0.5);
         container.add(icon);
         
         // Name
-        const name = this.scene.add.text(0, -height / 2 + 110, upgrade.name, {
+        var name = this.scene.add.text(0, -height / 2 + 82, upgrade.name, {
             fontFamily: 'Rubik, sans-serif',
-            fontSize: '14px',
+            fontSize: '11px',
             fontWeight: '700',
-            color: '#ffffff',
-            wordWrap: { width: width - 20 },
+            color: canAfford ? '#ffffff' : '#888888',
+            wordWrap: { width: width - 10 },
             align: 'center'
         }).setOrigin(0.5, 0);
         container.add(name);
         
         // Description
-        const desc = this.scene.add.text(0, -height / 2 + 135, upgrade.description, {
+        var desc = this.scene.add.text(0, -height / 2 + 100, upgrade.description, {
             fontFamily: 'Inter, sans-serif',
-            fontSize: '11px',
-            color: '#aaaaaa',
-            wordWrap: { width: width - 20 },
+            fontSize: '9px',
+            color: canAfford ? '#aaaaaa' : '#666666',
+            wordWrap: { width: width - 10 },
             align: 'center'
         }).setOrigin(0.5, 0);
         container.add(desc);
         
-        // Level indicator
-        const levelText = this.scene.add.text(0, height / 2 - 25, 
-            isMaxed ? 'MAX' : `Level ${currentLevel + 1}/${upgrade.maxLevel}`, {
-            fontFamily: 'Inter, sans-serif',
-            fontSize: '10px',
-            fontWeight: '600',
-            color: isMaxed ? '#ffaa00' : '#666666'
-        }).setOrigin(0.5);
-        container.add(levelText);
+        // Cost display
+        var costText;
+        if (isMaxed) {
+            costText = this.scene.add.text(0, height / 2 - 20, 'MAXED', {
+                fontFamily: 'Rubik, sans-serif',
+                fontSize: '12px',
+                fontWeight: '700',
+                color: '#ffaa00'
+            }).setOrigin(0.5);
+        } else if (canAfford) {
+            costText = this.scene.add.text(0, height / 2 - 20, '💎 ' + cost + ' XP', {
+                fontFamily: 'Rubik, sans-serif',
+                fontSize: '12px',
+                fontWeight: '700',
+                color: '#00ffff'
+            }).setOrigin(0.5);
+        } else {
+            var needed = cost - currentXP;
+            costText = this.scene.add.text(0, height / 2 - 20, 'Need ' + needed + ' more', {
+                fontFamily: 'Inter, sans-serif',
+                fontSize: '10px',
+                fontWeight: '600',
+                color: '#ff6666'
+            }).setOrigin(0.5);
+        }
+        container.add(costText);
         
-        // Make interactive with EXPLICIT hit area rectangle
-        // The hit area is centered on the container (0,0), so offset by -width/2, -height/2
+        // Make interactive
         var hitArea = new Phaser.Geom.Rectangle(-width / 2, -height / 2, width, height);
         container.setSize(width, height);
         container.setInteractive(hitArea, Phaser.Geom.Rectangle.Contains);
         
-        // Store reference for click handler
         var self = this;
         var upgradeData = upgrade;
-        var cardBg = bg;
+        var upgradeCost = cost;
         
         container.on('pointerover', function() {
-            if (!isMaxed && !self.selectionMade) {
+            if (canAfford && !self.selectionMade) {
                 self.scene.tweens.add({
                     targets: container,
-                    scaleX: 1.05,
-                    scaleY: 1.05,
+                    scaleX: 1.08,
+                    scaleY: 1.08,
                     duration: 100
                 });
             }
         });
         
         container.on('pointerout', function() {
-            if (!self.selectionMade) {
-                self.scene.tweens.add({
-                    targets: container,
-                    scaleX: 1,
-                    scaleY: 1,
-                    duration: 100
-                });
-            }
+            self.scene.tweens.add({
+                targets: container,
+                scaleX: 1,
+                scaleY: 1,
+                duration: 100
+            });
         });
         
         container.on('pointerdown', function() {
-            console.log('Upgrade card clicked:', upgradeData.id, upgradeData.name);
+            console.log('Card clicked:', upgradeData.id, 'canAfford:', canAfford);
             
-            // Update debug text
-            if (self.debugSelectText) {
-                self.debugSelectText.setText('Selected: ' + upgradeData.id);
-            }
-            
-            // Visual press feedback
+            // Visual feedback
             container.setScale(0.95);
             self.scene.time.delayedCall(100, function() {
-                if (container && container.active) {
-                    container.setScale(1);
-                }
+                if (container.active) container.setScale(1);
             });
             
-            if (!isMaxed && !self.selectionMade) {
-                self.selectUpgrade(upgradeData);
+            if (canAfford && !self.selectionMade) {
+                self.debugSelectText.setText('Selected: ' + upgradeData.id + ' (-' + upgradeCost + ' XP)');
+                self.selectUpgrade(upgradeData, upgradeCost);
+            } else if (!canAfford) {
+                self.debugSelectText.setText('Cannot afford ' + upgradeData.id + ' (need ' + cost + ' XP)');
             }
         });
         
         // Entrance animation
         container.alpha = 0;
-        container.y += 50;
+        container.y += 40;
         this.scene.tweens.add({
             targets: container,
             alpha: 1,
             y: y,
-            duration: 400,
-            delay: index * 100,
+            duration: 350,
+            delay: index * 80,
             ease: 'Back.easeOut'
         });
         
         return container;
     }
     
-    createRerollButton(x, y, callback) {
-        const container = this.scene.add.container(x, y);
+    createSkipButton(x, y) {
+        var container = this.scene.add.container(x, y);
         
-        const bg = this.scene.add.graphics();
-        bg.fillStyle(0x333344);
-        bg.fillRoundedRect(-70, -20, 140, 40, 8);
+        var bg = this.scene.add.graphics();
+        bg.fillStyle(0x444455);
+        bg.fillRoundedRect(-60, -18, 120, 36, 8);
         bg.lineStyle(2, 0x666677);
-        bg.strokeRoundedRect(-70, -20, 140, 40, 8);
+        bg.strokeRoundedRect(-60, -18, 120, 36, 8);
         container.add(bg);
         
-        const text = this.scene.add.text(0, 0, '🔄 REROLL (1x)', {
-            fontFamily: 'Inter, sans-serif',
+        var text = this.scene.add.text(0, 0, 'SKIP →', {
+            fontFamily: 'Rubik, sans-serif',
             fontSize: '14px',
-            fontWeight: '600',
+            fontWeight: '700',
             color: '#ffffff'
         }).setOrigin(0.5);
         container.add(text);
         
-        // Explicit hit area for container
-        var hitArea = new Phaser.Geom.Rectangle(-70, -20, 140, 40);
-        container.setSize(140, 40);
+        var hitArea = new Phaser.Geom.Rectangle(-60, -18, 120, 36);
         container.setInteractive(hitArea, Phaser.Geom.Rectangle.Contains);
         
+        var self = this;
         container.on('pointerdown', function() {
-            console.log('Reroll button clicked');
+            console.log('Skip button clicked');
             container.setScale(0.95);
-            callback();
+            if (!self.selectionMade) {
+                self.selectionMade = true;
+                self.debugSelectText.setText('Skipped upgrade');
+                self.closeAndContinue(null, 0);
+            }
         });
         
         container.on('pointerover', function() {
@@ -491,50 +560,98 @@ class UpgradeSelectionUI {
         return container;
     }
     
-    selectUpgrade(upgrade) {
-        // Prevent double-selection
+    createRerollButton(x, y, currentXP) {
+        var container = this.scene.add.container(x, y);
+        var canAfford = currentXP >= REROLL_COST;
+        
+        var bg = this.scene.add.graphics();
+        bg.fillStyle(canAfford ? 0x335533 : 0x333333);
+        bg.fillRoundedRect(-60, -18, 120, 36, 8);
+        bg.lineStyle(2, canAfford ? 0x44aa44 : 0x555555);
+        bg.strokeRoundedRect(-60, -18, 120, 36, 8);
+        container.add(bg);
+        
+        var text = this.scene.add.text(0, 0, '🔄 ' + REROLL_COST + ' XP', {
+            fontFamily: 'Rubik, sans-serif',
+            fontSize: '12px',
+            fontWeight: '700',
+            color: canAfford ? '#88ff88' : '#666666'
+        }).setOrigin(0.5);
+        container.add(text);
+        
+        var hitArea = new Phaser.Geom.Rectangle(-60, -18, 120, 36);
+        container.setInteractive(hitArea, Phaser.Geom.Rectangle.Contains);
+        
+        var self = this;
+        container.on('pointerdown', function() {
+            console.log('Reroll clicked, canAfford:', canAfford);
+            container.setScale(0.95);
+            
+            if (canAfford && !self.selectionMade) {
+                // Deduct XP
+                self.gameScene.xpCurrency -= REROLL_COST;
+                self.debugSelectText.setText('Rerolled (-' + REROLL_COST + ' XP)');
+                
+                // Hide and show new choices
+                self.hide();
+                var newChoices = self.upgradeManager.getRandomChoices(3);
+                self.show(newChoices, self.upgradeManager, self.gameScene, self.selectedCallback);
+            }
+        });
+        
+        container.on('pointerover', function() {
+            if (canAfford) container.setScale(1.05);
+        });
+        
+        container.on('pointerout', function() {
+            container.setScale(1);
+        });
+        
+        return container;
+    }
+    
+    selectUpgrade(upgrade, cost) {
         if (this.selectionMade) {
-            console.log('Selection already made, ignoring');
+            console.log('Selection already made');
             return;
         }
         this.selectionMade = true;
         
-        console.log('selectUpgrade called:', upgrade.id, upgrade.name);
+        console.log('selectUpgrade:', upgrade.id, 'cost:', cost);
         
-        // Play level up sound
         if (this.scene.audioManager) {
             this.scene.audioManager.playLevelUp();
         }
         
-        // Store callback before animation (in case container gets destroyed)
+        this.closeAndContinue(upgrade, cost);
+    }
+    
+    closeAndContinue(upgrade, cost) {
         var callback = this.selectedCallback;
-        var selectedUpgrade = upgrade;
         var self = this;
         
-        // Selection animation
         this.scene.tweens.add({
             targets: this.container,
             alpha: 0,
             duration: 200,
             onComplete: function() {
-                console.log('Upgrade selection animation complete, closing UI');
                 self.hide();
                 if (callback) {
-                    console.log('Calling upgrade callback with:', selectedUpgrade.id);
-                    callback(selectedUpgrade);
+                    callback(upgrade, cost);
                 }
             }
         });
     }
     
     hide() {
-        console.log('UpgradeSelectionUI.hide() called');
+        console.log('UpgradeSelectionUI.hide()');
         if (this.container) {
             this.container.destroy();
             this.container = null;
         }
         this.selectionMade = false;
         this.selectedCallback = null;
+        this.gameScene = null;
     }
 }
 
