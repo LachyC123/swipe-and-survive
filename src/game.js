@@ -505,26 +505,39 @@ class GameScene extends Phaser.Scene {
     }
     
     handlePlayerProjectileHit(projectileGraphics, enemyContainer) {
+        // Safeguard: validate graphics object
+        if (!projectileGraphics || !projectileGraphics.active) return;
+        if (!enemyContainer || !enemyContainer.active) return;
+        
         // Find the projectile object
         const projectile = this.playerProjectileObjects.find(p => p.graphics === projectileGraphics);
-        if (!projectile) return;
+        if (!projectile || !projectile.graphics) return;
         
         // Find the enemy object
         const enemy = this.enemyObjects.find(e => e.container === enemyContainer);
         if (!enemy || !enemy.active) return;
         
-        // Apply damage
-        const angle = Math.atan2(
-            enemy.container.y - projectile.graphics.y,
-            enemy.container.x - projectile.graphics.x
-        );
+        // Safeguard: validate positions exist
+        if (!enemy.container || !projectile.graphics) return;
         
-        const died = enemy.takeDamage(projectile.damage, angle, projectile.isCrit);
+        // Apply damage with safeguarded angle calculation
+        var enemyX = enemy.container.x || 0;
+        var enemyY = enemy.container.y || 0;
+        var projX = projectile.graphics.x || 0;
+        var projY = projectile.graphics.y || 0;
         
-        // Lifesteal
-        const stats = this.upgradeManager.stats;
-        if (stats.lifestealPercent > 0) {
-            this.player.heal(projectile.damage * stats.lifestealPercent);
+        var angle = Math.atan2(enemyY - projY, enemyX - projX);
+        // Safeguard against NaN
+        if (!isFinite(angle)) angle = 0;
+        
+        const died = enemy.takeDamage(projectile.damage || 0, angle, projectile.isCrit);
+        
+        // Lifesteal with safeguards
+        if (this.upgradeManager && this.upgradeManager.stats && this.player) {
+            const stats = this.upgradeManager.stats;
+            if (stats.lifestealPercent > 0 && projectile.damage > 0) {
+                this.player.heal(projectile.damage * stats.lifestealPercent);
+            }
         }
         
         if (died) {
@@ -533,48 +546,69 @@ class GameScene extends Phaser.Scene {
         }
         
         // Handle projectile pierce/bounce
-        if (projectile.onHit(enemy)) {
+        try {
+            if (projectile.onHit && projectile.onHit(enemy)) {
+                this.removePlayerProjectile(projectile);
+            }
+        } catch (e) {
+            // Safeguard: remove projectile if error
             this.removePlayerProjectile(projectile);
         }
     }
     
     handleEnemyProjectileHit(projectileGraphics, playerContainer) {
+        // Safeguard: validate objects
+        if (!projectileGraphics || !projectileGraphics.active) return;
+        if (!this.player) return;
+        
         const projectile = this.enemyProjectileObjects.find(p => p.graphics === projectileGraphics);
         if (!projectile) return;
         
-        const died = this.player.takeDamage(projectile.damage);
+        const died = this.player.takeDamage(projectile.damage || 0);
         this.removeEnemyProjectile(projectile);
         
-        if (died) {
+        if (died && !this.gameOver) {
             this.handleGameOver();
         }
     }
     
     handleEnemyPlayerCollision(enemyContainer, playerContainer) {
+        // Safeguard: validate objects
+        if (!enemyContainer || !enemyContainer.active) return;
+        if (!this.player) return;
+        
         const enemy = this.enemyObjects.find(e => e.container === enemyContainer);
         if (!enemy || !enemy.active) return;
         
         // Contact damage with cooldown
         if (!enemy.contactCooldown) {
-            const died = this.player.takeDamage(enemy.damage, enemy);
+            const died = this.player.takeDamage(enemy.damage || 0, enemy);
             enemy.contactCooldown = true;
             
-            this.time.delayedCall(500, () => {
-                if (enemy.active) enemy.contactCooldown = false;
-            });
+            // Safeguard: wrap in try-catch
+            try {
+                this.time.delayedCall(500, () => {
+                    if (enemy && enemy.active) enemy.contactCooldown = false;
+                });
+            } catch (e) {
+                // Scene may be destroyed
+            }
             
-            if (died) {
+            if (died && !this.gameOver) {
                 this.handleGameOver();
             }
         }
     }
     
     handleDashTrailHit(trailZone, enemyContainer) {
+        // Safeguard: validate objects
+        if (!trailZone || !enemyContainer || !enemyContainer.active) return;
+        
         const enemy = this.enemyObjects.find(e => e.container === enemyContainer);
         if (!enemy || !enemy.active) return;
         
         if (!enemy.trailHitCooldown) {
-            enemy.takeDamage(trailZone.damage, null, false);
+            enemy.takeDamage(trailZone.damage || 0, null, false);
             enemy.trailHitCooldown = true;
             
             this.time.delayedCall(200, () => {

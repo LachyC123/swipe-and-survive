@@ -111,37 +111,54 @@ class Player {
     }
     
     update(time, delta, stats) {
+        // Safeguard: validate stats
+        if (!stats) stats = {};
+        
+        // Safeguard: clamp delta to prevent huge jumps
+        if (!isFinite(delta) || delta < 0) delta = 16;
+        if (delta > 100) delta = 100;
+        
         // Update overcharge timer
         if (this.overchargeTimer > 0) {
             this.overchargeTimer -= delta;
+            if (this.overchargeTimer < 0) this.overchargeTimer = 0;
         }
         
         // Update barrier timer
         if (!this.hasBarrier && stats.barrierCharges > 0) {
             this.barrierTimer += delta;
-            if (this.barrierTimer >= stats.barrierCooldown) {
+            if (this.barrierTimer >= (stats.barrierCooldown || 15000)) {
                 this.hasBarrier = true;
                 this.barrierTimer = 0;
-                this.barrierVisual.visible = true;
+                if (this.barrierVisual) this.barrierVisual.visible = true;
             }
         }
         
         // Update shield visual
-        this.shieldVisual.visible = this.hasShield;
+        if (this.shieldVisual) {
+            this.shieldVisual.visible = this.hasShield;
+        }
         
         // Update orbiting blades
-        if (stats.orbitingBlades > 0) {
+        if (stats.orbitingBlades > 0 && this.scene) {
             this.updateOrbitingBlades(stats.orbitingBlades, delta);
         }
         
-        // Orbit angle rotation
+        // Orbit angle rotation with safeguard
         this.orbitAngle += delta * 0.003;
+        // Prevent angle from growing infinitely
+        if (this.orbitAngle > Math.PI * 2) {
+            this.orbitAngle -= Math.PI * 2;
+        }
     }
     
     updateOrbitingBlades(count, delta) {
+        // Safeguard: validate scene
+        if (!this.scene || !this.scene.add) return;
+        
         // Ensure correct number of blades
         while (this.orbitBlades.length < count) {
-            const blade = this.scene.add.graphics();
+            var blade = this.scene.add.graphics();
             blade.fillStyle(0x00ffff);
             blade.fillTriangle(0, -8, 4, 8, -4, 8);
             blade.lineStyle(1, 0xffffff);
@@ -175,27 +192,42 @@ class Player {
     }
     
     dash(dirX, dirY) {
+        // Safeguard: validate scene and time
+        if (!this.scene || !this.scene.time) return false;
+        
         const time = this.scene.time.now;
-        const stats = this.scene.upgradeManager?.stats || {};
+        const stats = (this.scene.upgradeManager && this.scene.upgradeManager.stats) ? this.scene.upgradeManager.stats : {};
         const cooldownMult = Math.max(0.3, stats.dashCooldownMultiplier || 1);
         
+        // Prevent double-dash
+        if (this.isDashing) return false;
         if (time - this.lastDashTime < this.dashCooldown * cooldownMult) return false;
         
         this.lastDashTime = time;
         this.isDashing = true;
         this.isInvulnerable = true;
         
-        // Normalize direction
-        const len = Math.sqrt(dirX * dirX + dirY * dirY);
-        if (len > 0) {
+        // Normalize direction with safeguards
+        var len = Math.sqrt(dirX * dirX + dirY * dirY);
+        if (len > 0 && isFinite(len)) {
             dirX /= len;
             dirY /= len;
+        } else {
+            // Default to facing direction if invalid
+            dirX = this.facing.x || 1;
+            dirY = this.facing.y || 0;
         }
+        
+        // Clamp direction values
+        if (!isFinite(dirX)) dirX = 1;
+        if (!isFinite(dirY)) dirY = 0;
         
         this.facing = { x: dirX, y: dirY };
         
-        // Apply dash velocity
-        this.body.setVelocity(dirX * this.dashSpeed, dirY * this.dashSpeed);
+        // Apply dash velocity with safeguard
+        if (this.body) {
+            this.body.setVelocity(dirX * this.dashSpeed, dirY * this.dashSpeed);
+        }
         
         // Create dash trail
         this.createDashTrail();
@@ -205,26 +237,45 @@ class Player {
             this.scene.audioManager.playDash();
         }
         
-        // End dash after duration
-        this.scene.time.delayedCall(this.dashDuration, () => {
-            this.isDashing = false;
-            this.body.setVelocity(0, 0);
-            
-            // End invulnerability slightly after dash
-            this.scene.time.delayedCall(50, () => {
-                this.isInvulnerable = false;
+        // Store reference to this for callbacks
+        var self = this;
+        var dashStats = stats; // Capture stats at dash time
+        
+        // End dash after duration - with safeguards
+        try {
+            this.scene.time.delayedCall(this.dashDuration, function() {
+                // Safeguard: check if player/scene still valid
+                if (!self || !self.scene) return;
+                
+                self.isDashing = false;
+                if (self.body) {
+                    self.body.setVelocity(0, 0);
+                }
+                
+                // End invulnerability slightly after dash
+                try {
+                    self.scene.time.delayedCall(50, function() {
+                        if (self) self.isInvulnerable = false;
+                    });
+                } catch (e) {
+                    self.isInvulnerable = false;
+                }
+                
+                // Shield on dash
+                if (dashStats.shieldOnDash && !self.hasShield) {
+                    self.hasShield = true;
+                }
+                
+                // Overcharge
+                if (dashStats.overchargeDuration > 0) {
+                    self.overchargeTimer = dashStats.overchargeDuration;
+                }
             });
-            
-            // Shield on dash
-            if (stats.shieldOnDash && !this.hasShield) {
-                this.hasShield = true;
-            }
-            
-            // Overcharge
-            if (stats.overchargeDuration > 0) {
-                this.overchargeTimer = stats.overchargeDuration;
-            }
-        });
+        } catch (e) {
+            // Reset dash state if delayed call fails
+            this.isDashing = false;
+            this.isInvulnerable = false;
+        }
         
         // Dash trail damage
         if (stats.dashTrailDamage > 0) {
@@ -235,55 +286,85 @@ class Player {
     }
     
     createDashTrail() {
+        // Safeguard: validate scene
+        if (!this.scene || !this.scene.add || !this.container) return;
+        
         const reduced = localStorage.getItem('reducedEffects') === 'true';
         if (reduced) return;
         
+        var self = this;
+        
         // Create afterimages
-        for (let i = 0; i < 3; i++) {
-            this.scene.time.delayedCall(i * 30, () => {
-                const ghost = this.scene.add.graphics();
-                ghost.fillStyle(0x00ffff, 0.4 - i * 0.1);
-                ghost.fillRoundedRect(-14, -8, 28, 32, 6);
-                ghost.fillCircle(0, -14, 12);
-                ghost.x = this.container.x;
-                ghost.y = this.container.y;
-                ghost.setDepth(50);
-                
-                this.scene.tweens.add({
-                    targets: ghost,
-                    alpha: 0,
-                    duration: 200,
-                    onComplete: () => ghost.destroy()
-                });
-            });
+        for (var i = 0; i < 3; i++) {
+            (function(index) {
+                try {
+                    self.scene.time.delayedCall(index * 30, function() {
+                        // Safeguard: check scene and container still exist
+                        if (!self.scene || !self.scene.add || !self.container) return;
+                        
+                        var ghost = self.scene.add.graphics();
+                        ghost.fillStyle(0x00ffff, 0.4 - index * 0.1);
+                        ghost.fillRoundedRect(-14, -8, 28, 32, 6);
+                        ghost.fillCircle(0, -14, 12);
+                        ghost.x = self.container.x || 0;
+                        ghost.y = self.container.y || 0;
+                        ghost.setDepth(50);
+                        
+                        self.scene.tweens.add({
+                            targets: ghost,
+                            alpha: 0,
+                            duration: 200,
+                            onComplete: function() {
+                                if (ghost && ghost.active !== false) {
+                                    ghost.destroy();
+                                }
+                            }
+                        });
+                    });
+                } catch (e) {
+                    // Ignore errors from delayed calls
+                }
+            })(i);
         }
     }
     
     createDamageTrail(dirX, dirY, damage) {
-        const trailZone = this.scene.add.zone(
-            this.container.x,
-            this.container.y,
-            this.dashSpeed * this.dashDuration / 1000 * 2,
-            40
-        );
-        trailZone.damage = damage;
-        trailZone.setRotation(Math.atan2(dirY, dirX));
+        // Safeguard: validate scene
+        if (!this.scene || !this.scene.add || !this.container) return;
         
-        this.scene.physics.add.existing(trailZone, true);
-        this.scene.dashTrails.add(trailZone);
-        
-        // Visual
-        const trailGraphics = this.scene.add.graphics();
-        trailGraphics.fillStyle(0xff8800, 0.4);
-        trailGraphics.fillRect(-trailZone.width / 2, -20, trailZone.width, 40);
-        trailGraphics.x = trailZone.x;
-        trailGraphics.y = trailZone.y;
-        trailGraphics.rotation = trailZone.rotation;
-        
-        this.scene.time.delayedCall(300, () => {
-            trailZone.destroy();
-            trailGraphics.destroy();
-        });
+        try {
+            var trailZone = this.scene.add.zone(
+                this.container.x || 0,
+                this.container.y || 0,
+                this.dashSpeed * this.dashDuration / 1000 * 2,
+                40
+            );
+            trailZone.damage = damage;
+            
+            var rotation = Math.atan2(dirY, dirX);
+            if (!isFinite(rotation)) rotation = 0;
+            trailZone.setRotation(rotation);
+            
+            this.scene.physics.add.existing(trailZone, true);
+            if (this.scene.dashTrails) {
+                this.scene.dashTrails.add(trailZone);
+            }
+            
+            // Visual
+            var trailGraphics = this.scene.add.graphics();
+            trailGraphics.fillStyle(0xff8800, 0.4);
+            trailGraphics.fillRect(-trailZone.width / 2, -20, trailZone.width, 40);
+            trailGraphics.x = trailZone.x;
+            trailGraphics.y = trailZone.y;
+            trailGraphics.rotation = trailZone.rotation;
+            
+            this.scene.time.delayedCall(300, function() {
+                if (trailZone && trailZone.active !== false) trailZone.destroy();
+                if (trailGraphics && trailGraphics.active !== false) trailGraphics.destroy();
+            });
+        } catch (e) {
+            // Ignore errors
+        }
     }
     
     canAttack() {
@@ -399,54 +480,83 @@ class Player {
     }
     
     createHitFlash(color) {
-        const flash = this.scene.add.graphics();
-        flash.fillStyle(color, 0.5);
-        flash.fillCircle(0, 0, 30);
-        flash.x = this.container.x;
-        flash.y = this.container.y;
-        flash.setDepth(101);
+        // Safeguard: validate scene and container
+        if (!this.scene || !this.scene.add || !this.container) return;
         
-        this.scene.tweens.add({
-            targets: flash,
-            alpha: 0,
-            scale: 1.5,
-            duration: 150,
-            onComplete: () => flash.destroy()
-        });
+        try {
+            var flash = this.scene.add.graphics();
+            flash.fillStyle(color, 0.5);
+            flash.fillCircle(0, 0, 30);
+            flash.x = this.container.x || 0;
+            flash.y = this.container.y || 0;
+            flash.setDepth(101);
+            
+            this.scene.tweens.add({
+                targets: flash,
+                alpha: 0,
+                scale: 1.5,
+                duration: 150,
+                onComplete: function() {
+                    if (flash && flash.active !== false) flash.destroy();
+                }
+            });
+        } catch (e) {
+            // Ignore errors
+        }
     }
     
     checkOrbitBladeDamage(enemies) {
-        if (this.orbitBlades.length === 0) return;
+        if (!this.orbitBlades || this.orbitBlades.length === 0) return;
+        if (!enemies || !enemies.getChildren) return;
         
-        const bladeDamage = 15;
+        var bladeDamage = 15;
         
-        for (const blade of this.orbitBlades) {
-            for (const enemy of enemies.getChildren()) {
-                if (!enemy.active) continue;
+        for (var i = 0; i < this.orbitBlades.length; i++) {
+            var blade = this.orbitBlades[i];
+            if (!blade) continue;
+            
+            var children = enemies.getChildren();
+            for (var j = 0; j < children.length; j++) {
+                var enemy = children[j];
+                if (!enemy || !enemy.active) continue;
                 
-                const dist = Phaser.Math.Distance.Between(
-                    blade.x, blade.y,
-                    enemy.container.x, enemy.container.y
+                // Safeguard: validate enemy container
+                if (!enemy.container) continue;
+                
+                var dist = Phaser.Math.Distance.Between(
+                    blade.x || 0, blade.y || 0,
+                    enemy.container.x || 0, enemy.container.y || 0
                 );
                 
-                if (dist < 25 && !enemy.bladeHitCooldown) {
+                if (isFinite(dist) && dist < 25 && !enemy.bladeHitCooldown) {
                     enemy.takeDamage(bladeDamage, null, false);
                     enemy.bladeHitCooldown = true;
-                    this.scene.time.delayedCall(300, () => {
-                        if (enemy.active) enemy.bladeHitCooldown = false;
-                    });
+                    try {
+                        this.scene.time.delayedCall(300, function() {
+                            if (enemy && enemy.active) enemy.bladeHitCooldown = false;
+                        });
+                    } catch (e) {
+                        // Ignore
+                    }
                 }
             }
         }
     }
     
     destroy() {
-        // Clean up orbiting blades
-        for (const blade of this.orbitBlades) {
-            blade.destroy();
+        // Clean up orbiting blades with safeguards
+        if (this.orbitBlades) {
+            for (var i = 0; i < this.orbitBlades.length; i++) {
+                var blade = this.orbitBlades[i];
+                if (blade && blade.destroy) {
+                    try { blade.destroy(); } catch (e) {}
+                }
+            }
+            this.orbitBlades = [];
         }
-        this.orbitBlades = [];
-        this.container.destroy();
+        if (this.container && this.container.destroy) {
+            try { this.container.destroy(); } catch (e) {}
+        }
     }
 }
 
@@ -487,56 +597,89 @@ class Enemy {
     update(time, delta, player) {
         if (!this.active) return;
         
+        // Safeguard: validate scene exists
+        if (!this.scene || !this.body) return;
+        
         // Update freeze
         if (this.isFrozen) {
             this.freezeTimer -= delta;
             if (this.freezeTimer <= 0) {
                 this.isFrozen = false;
-                this.graphics.setTint(0xffffff);
+                // Restore alpha when unfreezing (Graphics don't support setTint)
+                if (this.graphics && this.graphics.active !== false) {
+                    this.graphics.setAlpha(1);
+                }
+                // Remove freeze overlay if exists
+                if (this.freezeOverlay) {
+                    this.freezeOverlay.destroy();
+                    this.freezeOverlay = null;
+                }
             }
-            this.body.setVelocity(0, 0);
+            if (this.body) {
+                this.body.setVelocity(0, 0);
+            }
             return;
         }
         
-        // Apply knockback decay
-        this.knockbackVelocity.x *= 0.9;
-        this.knockbackVelocity.y *= 0.9;
+        // Apply knockback decay with safeguards
+        if (this.knockbackVelocity) {
+            this.knockbackVelocity.x *= 0.9;
+            this.knockbackVelocity.y *= 0.9;
+            // Clamp to prevent NaN/Infinity
+            if (!isFinite(this.knockbackVelocity.x)) this.knockbackVelocity.x = 0;
+            if (!isFinite(this.knockbackVelocity.y)) this.knockbackVelocity.y = 0;
+        }
     }
     
     takeDamage(amount, sourceAngle, isCrit) {
+        // Safeguard: validate this enemy is still active
+        if (!this.active || !this.scene) return false;
+        
+        // Safeguard: clamp damage to valid number
+        if (!isFinite(amount) || amount < 0) amount = 0;
+        
         this.hp -= amount;
         
-        // Hit flash
-        if (this.graphics) {
-            this.graphics.setTint(0xffffff);
-            this.scene.time.delayedCall(50, () => {
-                if (this.graphics && this.active) {
-                    this.graphics.clearTint();
-                }
-            });
+        // Hit flash using alpha (Graphics don't support setTint)
+        if (this.graphics && this.graphics.active !== false && this.container && this.container.active !== false) {
+            this.graphics.setAlpha(0.5);
+            // Use try-catch for delayed call in case scene is destroyed
+            try {
+                this.scene.time.delayedCall(50, () => {
+                    if (this.graphics && this.active && this.graphics.active !== false) {
+                        this.graphics.setAlpha(this.isFrozen ? 0.7 : 1);
+                    }
+                });
+            } catch (e) {
+                // Scene may have been destroyed
+            }
         }
         
-        // Damage number
-        this.scene.createDamageNumber(
-            this.container.x,
-            this.container.y - 20,
-            Math.round(amount),
-            isCrit
-        );
+        // Damage number with safeguards
+        if (this.scene && this.scene.createDamageNumber && this.container) {
+            var dmgX = this.container.x || 0;
+            var dmgY = (this.container.y || 0) - 20;
+            // Clamp position to valid range
+            if (isFinite(dmgX) && isFinite(dmgY)) {
+                this.scene.createDamageNumber(dmgX, dmgY, Math.round(amount), isCrit);
+            }
+        }
         
-        // Knockback
-        if (sourceAngle !== null) {
-            const knockbackForce = 100;
+        // Knockback with safeguards
+        if (sourceAngle !== null && isFinite(sourceAngle) && this.knockbackVelocity) {
+            var knockbackForce = 100;
             this.knockbackVelocity.x = Math.cos(sourceAngle) * knockbackForce;
             this.knockbackVelocity.y = Math.sin(sourceAngle) * knockbackForce;
         }
         
         // Hit particles
-        this.createHitParticles();
+        if (this.scene && this.createHitParticles) {
+            this.createHitParticles();
+        }
         
         // Freeze chance
-        const stats = this.scene.upgradeManager?.stats || {};
-        if (stats.freezeChance > 0 && Math.random() < stats.freezeChance) {
+        var stats = (this.scene && this.scene.upgradeManager) ? this.scene.upgradeManager.stats : {};
+        if (stats && stats.freezeChance > 0 && Math.random() < stats.freezeChance) {
             this.freeze(1500);
         }
         
@@ -550,10 +693,26 @@ class Enemy {
     }
     
     freeze(duration) {
+        if (!this.active || !this.scene) return;
+        
         this.isFrozen = true;
         this.freezeTimer = duration;
-        if (this.graphics) {
-            this.graphics.setTint(0x8888ff);
+        
+        // Use alpha change for freeze effect (Graphics don't support setTint)
+        if (this.graphics && this.graphics.active !== false) {
+            this.graphics.setAlpha(0.7);
+        }
+        
+        // Create blue freeze overlay on container
+        if (this.container && this.container.active !== false && !this.freezeOverlay) {
+            try {
+                this.freezeOverlay = this.scene.add.graphics();
+                this.freezeOverlay.fillStyle(0x8888ff, 0.3);
+                this.freezeOverlay.fillCircle(0, 0, 20);
+                this.container.add(this.freezeOverlay);
+            } catch (e) {
+                // Scene may not be available
+            }
         }
     }
     
