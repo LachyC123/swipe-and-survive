@@ -466,6 +466,7 @@ class UpgradeSelectionUI {
         this.container = null;
         this.selectedCallback = null;
         this.gameScene = null; // Reference to game scene for XP
+        this.interactiveElements = []; // Track interactive elements for cleanup
     }
     
     show(choices, upgradeManager, gameScene, callback) {
@@ -552,6 +553,9 @@ class UpgradeSelectionUI {
         var self = this;
         var currentWave = gameScene.wave || 1;
         
+        // Store references to interactive elements for cleanup
+        this.interactiveElements = [];
+        
         validChoices.forEach(function(upgrade, index) {
             var cardX = startX + index * (cardWidth + cardSpacing);
             var cardY = height / 2 - 30;
@@ -560,17 +564,18 @@ class UpgradeSelectionUI {
                 cardX, cardY, cardWidth, cardHeight,
                 upgrade, upgradeManager, index, currentXP, currentWave
             );
-            self.container.add(card);
+            // Add to scene directly for better touch handling, NOT to container
+            self.interactiveElements.push(card);
         });
         
-        // Skip button (always available)
+        // Skip button (always available) - add to scene directly
         var skipBtn = this.createSkipButton(width / 2 - 80, height - 70);
-        this.container.add(skipBtn);
+        this.interactiveElements.push(skipBtn);
         
-        // Reroll button (costs XP with wave scaling)
+        // Reroll button (costs XP with wave scaling) - add to scene directly
         var rerollCost = getRerollCost(currentWave);
         var rerollBtn = this.createRerollButton(width / 2 + 80, height - 70, currentXP, rerollCost);
-        this.container.add(rerollBtn);
+        this.interactiveElements.push(rerollBtn);
         
         // Entrance animation
         this.container.alpha = 0;
@@ -995,6 +1000,16 @@ class UpgradeSelectionUI {
         if (this.debugInputHandler) {
             this.scene.input.off('pointerdown', this.debugInputHandler);
             this.debugInputHandler = null;
+        }
+        
+        // Destroy interactive elements (cards, buttons)
+        if (this.interactiveElements) {
+            this.interactiveElements.forEach(function(elem) {
+                if (elem && elem.destroy) {
+                    elem.destroy();
+                }
+            });
+            this.interactiveElements = [];
         }
         
         if (this.container) {
