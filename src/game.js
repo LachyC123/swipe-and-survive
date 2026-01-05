@@ -475,8 +475,13 @@ class GameScene extends Phaser.Scene {
             this.audioManager.playHit();
         }
         
-        // Update debug text immediately
-        this.debugHpText.setText('HP: ' + Math.ceil(this.player.hp) + '/' + maxHp);
+        // Log damage for debugging
+        console.log('DAMAGE APPLIED:', amount, '| HP:', Math.ceil(this.player.hp), '/', maxHp, '| debugHpText exists:', !!this.debugHpText);
+        
+        // Update debug text if it exists (optional)
+        if (this.debugHpText && this.debugHpText.setText) {
+            this.debugHpText.setText('HP: ' + Math.ceil(this.player.hp) + '/' + maxHp);
+        }
         
         // Check death
         if (this.player.hp <= 0) {
@@ -536,8 +541,15 @@ class GameScene extends Phaser.Scene {
         this.swipeStart = null;
         this.swipeThreshold = 30;
         
+        // Allow input to pass through to UI elements (important for upgrade menu)
+        this.input.topOnly = true;
+        
         this.input.on('pointerdown', (pointer) => {
-            if (this.isPaused || this.isIntermission || this.gameOver) return;
+            // Skip if UI is active (pause, upgrade menu, game over)
+            if (this.isPaused || this.isIntermission || this.gameOver) {
+                console.log('Game input blocked - UI active (isPaused:', this.isPaused, 'isIntermission:', this.isIntermission, 'gameOver:', this.gameOver, ')');
+                return;
+            }
             
             this.swipeStart = { x: pointer.x, y: pointer.y, time: this.time.now };
             
