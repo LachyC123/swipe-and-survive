@@ -376,8 +376,102 @@ class GameScene extends Phaser.Scene {
         // Setup collisions
         this.setupCollisions();
         
+        // Debug HP text (top-left, always visible)
+        this.debugHpText = this.add.text(10, 10, 'HP: 100/100', {
+            fontFamily: 'monospace',
+            fontSize: '14px',
+            color: '#00ff00',
+            backgroundColor: '#000000aa',
+            padding: { x: 5, y: 3 }
+        }).setScrollFactor(0).setDepth(9999);
+        
+        // Player damage invulnerability tracking
+        this.playerInvulnTime = 0;
+        this.playerInvulnDuration = 400; // ms of i-frames after taking damage
+        
         // Start first wave
         this.startWave();
+    }
+    
+    /**
+     * Single source of truth for applying damage to player
+     * @param {number} amount - Damage amount
+     * @param {object} source - Optional source for knockback direction
+     * @returns {boolean} - True if player died
+     */
+    applyPlayerDamage(amount, source) {
+        if (!this.player) return false;
+        
+        // Check invulnerability
+        var now = this.time.now;
+        if (this.player.isInvulnerable || this.player.isDashing) {
+            return false;
+        }
+        if (now < this.playerInvulnTime) {
+            return false;
+        }
+        
+        // Clamp damage to valid range
+        amount = Math.max(0, amount || 0);
+        if (amount <= 0) return false;
+        
+        // Get max HP from upgrades
+        var stats = this.upgradeManager ? this.upgradeManager.stats : {};
+        var maxHp = stats.maxHp || this.player.maxHp || 100;
+        
+        // Apply damage
+        this.player.hp -= amount;
+        
+        // Clamp HP to 0
+        if (this.player.hp < 0) this.player.hp = 0;
+        
+        // Set invulnerability window
+        this.playerInvulnTime = now + this.playerInvulnDuration;
+        this.player.isInvulnerable = true;
+        
+        // Reset invulnerability after duration
+        var self = this;
+        this.time.delayedCall(this.playerInvulnDuration, function() {
+            if (self.player && !self.player.isDashing) {
+                self.player.isInvulnerable = false;
+            }
+        });
+        
+        // Visual feedback - hit flash
+        this.player.createHitFlash(0xff0000);
+        
+        // Knockback from source
+        if (source && source.container && this.player.body) {
+            var knockDir = Math.atan2(
+                this.player.container.y - source.container.y,
+                this.player.container.x - source.container.x
+            );
+            this.player.body.setVelocity(
+                Math.cos(knockDir) * 150,
+                Math.sin(knockDir) * 150
+            );
+        }
+        
+        // Screen shake
+        var reduced = localStorage.getItem('reducedEffects') === 'true';
+        if (!reduced) {
+            this.cameras.main.shake(100, 0.01);
+        }
+        
+        // Play hit sound
+        if (this.audioManager) {
+            this.audioManager.playHit();
+        }
+        
+        // Update debug text immediately
+        this.debugHpText.setText('HP: ' + Math.ceil(this.player.hp) + '/' + maxHp);
+        
+        // Check death
+        if (this.player.hp <= 0) {
+            return true;
+        }
+        
+        return false;
     }
     
     createArena() {
@@ -572,11 +666,17 @@ class GameScene extends Phaser.Scene {
         if (!projectileGraphics || !projectileGraphics.active) return;
         if (!this.player) return;
         
-        const projectile = this.enemyProjectileObjects.find(p => p.graphics === projectileGraphics);
+        var projectile = this.enemyProjectileObjects.find(p => p.graphics === projectileGraphics);
         if (!projectile) return;
         
-        const died = this.player.takeDamage(projectile.damage || 0);
+        // Apply damage using centralized function
+        var damage = projectile.damage || 10;
+        var died = this.applyPlayerDamage(damage, null);
+        
+        // Always despawn the bullet on hit
         this.removeEnemyProjectile(projectile);
+        
+        console.log('Enemy projectile hit player, damage:', damage, 'died:', died);
         
         if (died && !this.gameOver) {
             this.handleGameOver();
@@ -588,26 +688,17 @@ class GameScene extends Phaser.Scene {
         if (!enemyContainer || !enemyContainer.active) return;
         if (!this.player) return;
         
-        const enemy = this.enemyObjects.find(e => e.container === enemyContainer);
+        var enemy = this.enemyObjects.find(e => e.container === enemyContainer);
         if (!enemy || !enemy.active) return;
         
-        // Contact damage with cooldown
-        if (!enemy.contactCooldown) {
-            const died = this.player.takeDamage(enemy.damage || 0, enemy);
-            enemy.contactCooldown = true;
-            
-            // Safeguard: wrap in try-catch
-            try {
-                this.time.delayedCall(500, () => {
-                    if (enemy && enemy.active) enemy.contactCooldown = false;
-                });
-            } catch (e) {
-                // Scene may be destroyed
-            }
-            
-            if (died && !this.gameOver) {
-                this.handleGameOver();
-            }
+        // Contact damage - the applyPlayerDamage handles i-frames
+        var damage = enemy.damage || 10;
+        var died = this.applyPlayerDamage(damage, enemy);
+        
+        console.log('Enemy contact with player, damage:', damage, 'died:', died);
+        
+        if (died && !this.gameOver) {
+            this.handleGameOver();
         }
     }
     
@@ -733,6 +824,22 @@ class GameScene extends Phaser.Scene {
             this.xpToNextLevel,
             this.upgradeManager.stats
         );
+        
+        // Update debug HP text every frame
+        if (this.debugHpText && this.player) {
+            var stats = this.upgradeManager ? this.upgradeManager.stats : {};
+            var maxHp = stats.maxHp || this.player.maxHp || 100;
+            var currentHp = Math.ceil(this.player.hp);
+            this.debugHpText.setText('HP: ' + currentHp + '/' + maxHp);
+            // Color based on HP
+            if (currentHp <= maxHp * 0.25) {
+                this.debugHpText.setColor('#ff4444');
+            } else if (currentHp <= maxHp * 0.5) {
+                this.debugHpText.setColor('#ffff44');
+            } else {
+                this.debugHpText.setColor('#44ff44');
+            }
+        }
     }
     
     handleAutoAttack() {
