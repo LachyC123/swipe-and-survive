@@ -464,6 +464,17 @@ class GameScene extends Phaser.Scene {
         this.wasd = this.input.keyboard.addKeys('W,A,S,D');
         this.spaceKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
         this.escKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.ESC);
+        
+        // Debug mode toggle (press D key)
+        this.debugMode = false;
+        this.debugKey = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.G);
+        this.debugGraphics = this.add.graphics();
+        this.debugGraphics.setDepth(5000);
+        this.debugText = this.add.text(10, 100, '', {
+            fontSize: '12px',
+            color: '#00ff00',
+            backgroundColor: '#000000'
+        }).setScrollFactor(0).setDepth(5001).setVisible(false);
     }
     
     setupCollisions() {
@@ -647,8 +658,22 @@ class GameScene extends Phaser.Scene {
             this.showPauseMenu();
         }
         
+        // Debug mode toggle (G key)
+        if (Phaser.Input.Keyboard.JustDown(this.debugKey)) {
+            this.debugMode = !this.debugMode;
+            this.debugText.setVisible(this.debugMode);
+            console.log('Debug mode:', this.debugMode ? 'ON' : 'OFF');
+        }
+        
         // Auto-attack nearest enemy
         this.handleAutoAttack();
+        
+        // Debug: draw targeting line and show projectile info
+        if (this.debugMode) {
+            this.updateDebugDisplay();
+        } else if (this.debugGraphics) {
+            this.debugGraphics.clear();
+        }
         
         // Update enemies
         for (const enemy of this.enemyObjects) {
@@ -734,6 +759,58 @@ class GameScene extends Phaser.Scene {
         if (nearest) {
             this.player.attack(nearest);
         }
+    }
+    
+    updateDebugDisplay() {
+        this.debugGraphics.clear();
+        
+        // Find nearest enemy and draw targeting line
+        var nearest = null;
+        var nearestDist = Infinity;
+        
+        for (var i = 0; i < this.enemyObjects.length; i++) {
+            var enemy = this.enemyObjects[i];
+            if (!enemy.active) continue;
+            
+            var dist = Phaser.Math.Distance.Between(
+                this.player.container.x, this.player.container.y,
+                enemy.container.x, enemy.container.y
+            );
+            
+            if (dist < nearestDist && dist < 300) {
+                nearest = enemy;
+                nearestDist = dist;
+            }
+        }
+        
+        // Draw line to target
+        if (nearest) {
+            this.debugGraphics.lineStyle(2, 0x00ff00, 0.5);
+            this.debugGraphics.lineBetween(
+                this.player.container.x, this.player.container.y,
+                nearest.container.x, nearest.container.y
+            );
+        }
+        
+        // Show projectile info
+        var debugInfo = 'DEBUG MODE (G to toggle)\n';
+        debugInfo += 'Projectiles: ' + this.playerProjectileObjects.length + '\n';
+        
+        if (this.playerProjectileObjects.length > 0) {
+            var p = this.playerProjectileObjects[0];
+            if (p && p.graphics && p.body) {
+                debugInfo += 'P0 pos: ' + Math.round(p.graphics.x) + ',' + Math.round(p.graphics.y) + '\n';
+                debugInfo += 'P0 vel: ' + Math.round(p.body.velocity.x) + ',' + Math.round(p.body.velocity.y) + '\n';
+                debugInfo += 'P0 speed: ' + Math.round(Math.sqrt(p.body.velocity.x*p.body.velocity.x + p.body.velocity.y*p.body.velocity.y));
+            }
+        }
+        
+        debugInfo += '\nTarget dist: ' + (nearest ? Math.round(nearestDist) : 'none');
+        debugInfo += '\nEnemies: ' + this.enemyObjects.filter(function(e) { return e.active; }).length;
+        debugInfo += '\nPlayer HP: ' + Math.round(this.player.hp);
+        debugInfo += '\nInvuln: ' + this.player.isInvulnerable;
+        
+        this.debugText.setText(debugInfo);
     }
     
     handleSpawning(time) {
