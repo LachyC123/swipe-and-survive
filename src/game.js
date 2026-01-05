@@ -95,6 +95,283 @@ class AudioManager {
 }
 
 // ===================================
+// CHARACTER DEFINITIONS
+// ===================================
+
+var CHARACTER_DEFS = {
+    starter: {
+        id: 'starter',
+        name: 'Recruit',
+        icon: '🎮',
+        description: 'Balanced starter character',
+        costGems: 0,
+        challenge: null, // Always unlocked
+        stats: {
+            maxHpMult: 1.0,
+            moveSpeedMult: 1.0,
+            damageMult: 1.0,
+            fireRateMult: 1.0,
+            pickupRangeMult: 1.0,
+            xpGainMult: 1.0,
+            dashCooldownMult: 1.0
+        },
+        perk: null,
+        perkDesc: 'No special abilities'
+    },
+    tank: {
+        id: 'tank',
+        name: 'Tank',
+        icon: '🛡️',
+        description: '+50% HP, -20% speed',
+        costGems: 25,
+        challenge: { id: 'survive_5_waves', desc: 'Survive 5 waves' },
+        stats: {
+            maxHpMult: 1.5,
+            moveSpeedMult: 0.8,
+            damageMult: 1.0,
+            fireRateMult: 1.0,
+            pickupRangeMult: 1.0,
+            xpGainMult: 1.0,
+            dashCooldownMult: 1.0
+        },
+        perk: 'thorns',
+        perkDesc: 'Reflects 10% damage to attackers'
+    },
+    glass_cannon: {
+        id: 'glass_cannon',
+        name: 'Glass Cannon',
+        icon: '💥',
+        description: '+50% damage, -40% HP',
+        costGems: 30,
+        challenge: { id: 'kill_50', desc: 'Kill 50 enemies in one run' },
+        stats: {
+            maxHpMult: 0.6,
+            moveSpeedMult: 1.0,
+            damageMult: 1.5,
+            fireRateMult: 1.0,
+            pickupRangeMult: 1.0,
+            xpGainMult: 1.0,
+            dashCooldownMult: 1.0
+        },
+        perk: 'crit_boost',
+        perkDesc: '+10% crit chance'
+    },
+    runner: {
+        id: 'runner',
+        name: 'Runner',
+        icon: '🏃',
+        description: '+30% speed, -20% damage',
+        costGems: 20,
+        challenge: { id: 'survive_10_waves', desc: 'Survive 10 waves' },
+        stats: {
+            maxHpMult: 1.0,
+            moveSpeedMult: 1.3,
+            damageMult: 0.8,
+            fireRateMult: 1.0,
+            pickupRangeMult: 1.0,
+            xpGainMult: 1.0,
+            dashCooldownMult: 0.8
+        },
+        perk: 'dash_trail',
+        perkDesc: 'Dash leaves damaging trail'
+    },
+    magnet: {
+        id: 'magnet',
+        name: 'Collector',
+        icon: '🧲',
+        description: '+80% pickup range, -20% HP',
+        costGems: 25,
+        challenge: { id: 'level_5', desc: 'Reach level 5' },
+        stats: {
+            maxHpMult: 0.8,
+            moveSpeedMult: 1.0,
+            damageMult: 1.0,
+            fireRateMult: 1.0,
+            pickupRangeMult: 1.8,
+            xpGainMult: 1.0,
+            dashCooldownMult: 1.0
+        },
+        perk: 'auto_collect',
+        perkDesc: 'Pickups fly to you faster'
+    },
+    scholar: {
+        id: 'scholar',
+        name: 'Scholar',
+        icon: '📚',
+        description: '+40% XP gain, -25% damage',
+        costGems: 35,
+        challenge: { id: 'level_10', desc: 'Reach level 10' },
+        stats: {
+            maxHpMult: 1.0,
+            moveSpeedMult: 1.0,
+            damageMult: 0.75,
+            fireRateMult: 1.0,
+            pickupRangeMult: 1.0,
+            xpGainMult: 1.4,
+            dashCooldownMult: 1.0
+        },
+        perk: 'extra_upgrade_choice',
+        perkDesc: '+1 upgrade choice'
+    },
+    gunner: {
+        id: 'gunner',
+        name: 'Gunner',
+        icon: '🔫',
+        description: '+40% fire rate, -15% damage',
+        costGems: 30,
+        challenge: { id: 'kill_100', desc: 'Kill 100 enemies in one run' },
+        stats: {
+            maxHpMult: 1.0,
+            moveSpeedMult: 1.0,
+            damageMult: 0.85,
+            fireRateMult: 1.4,
+            pickupRangeMult: 1.0,
+            xpGainMult: 1.0,
+            dashCooldownMult: 1.0
+        },
+        perk: 'extra_projectile',
+        perkDesc: 'Fires an extra projectile'
+    },
+    survivor: {
+        id: 'survivor',
+        name: 'Survivor',
+        icon: '💚',
+        description: 'HP regen, -20% damage',
+        costGems: 40,
+        challenge: { id: 'upgrades_5', desc: 'Get 5 upgrades in one run' },
+        stats: {
+            maxHpMult: 1.0,
+            moveSpeedMult: 1.0,
+            damageMult: 0.8,
+            fireRateMult: 1.0,
+            pickupRangeMult: 1.0,
+            xpGainMult: 1.0,
+            dashCooldownMult: 1.0
+        },
+        perk: 'regen',
+        perkDesc: 'Regenerate 1 HP every 3 seconds'
+    },
+    gambler: {
+        id: 'gambler',
+        name: 'Gambler',
+        icon: '🎲',
+        description: '+2 rerolls, -15% HP',
+        costGems: 35,
+        challenge: { id: 'upgrades_10', desc: 'Get 10 upgrades in one run' },
+        stats: {
+            maxHpMult: 0.85,
+            moveSpeedMult: 1.0,
+            damageMult: 1.0,
+            fireRateMult: 1.0,
+            pickupRangeMult: 1.0,
+            xpGainMult: 1.0,
+            dashCooldownMult: 1.0
+        },
+        perk: 'extra_rerolls',
+        perkDesc: '+2 upgrade rerolls per wave'
+    },
+    sniper: {
+        id: 'sniper',
+        name: 'Sniper',
+        icon: '🎯',
+        description: '+60% damage, -35% fire rate',
+        costGems: 45,
+        challenge: { id: 'survive_15_waves', desc: 'Survive 15 waves' },
+        stats: {
+            maxHpMult: 0.9,
+            moveSpeedMult: 1.0,
+            damageMult: 1.6,
+            fireRateMult: 0.65,
+            pickupRangeMult: 1.0,
+            xpGainMult: 1.0,
+            dashCooldownMult: 1.0
+        },
+        perk: 'pierce',
+        perkDesc: 'Projectiles pierce 1 enemy'
+    },
+    berserker: {
+        id: 'berserker',
+        name: 'Berserker',
+        icon: '😤',
+        description: 'More damage when low HP, -25% max HP',
+        costGems: 50,
+        challenge: { id: 'kill_200', desc: 'Kill 200 enemies in one run' },
+        stats: {
+            maxHpMult: 0.75,
+            moveSpeedMult: 1.0,
+            damageMult: 1.0,
+            fireRateMult: 1.0,
+            pickupRangeMult: 1.0,
+            xpGainMult: 1.0,
+            dashCooldownMult: 1.0
+        },
+        perk: 'rage',
+        perkDesc: '+50% damage when below 30% HP'
+    }
+};
+
+// Make available globally
+window.CHARACTER_DEFS = CHARACTER_DEFS;
+
+// ===================================
+// SAVE/LOAD HELPERS
+// ===================================
+
+function getPlayerProgress() {
+    return {
+        gemsYellow: parseInt(localStorage.getItem('gemsYellow') || '0'),
+        unlockedCharacterIds: JSON.parse(localStorage.getItem('unlockedCharacterIds') || '["starter"]'),
+        completedChallengeIds: JSON.parse(localStorage.getItem('completedChallengeIds') || '[]'),
+        selectedCharacterId: localStorage.getItem('selectedCharacterId') || 'starter'
+    };
+}
+
+function savePlayerProgress(progress) {
+    localStorage.setItem('gemsYellow', progress.gemsYellow.toString());
+    localStorage.setItem('unlockedCharacterIds', JSON.stringify(progress.unlockedCharacterIds));
+    localStorage.setItem('completedChallengeIds', JSON.stringify(progress.completedChallengeIds));
+    localStorage.setItem('selectedCharacterId', progress.selectedCharacterId);
+}
+
+function unlockCharacter(characterId) {
+    var progress = getPlayerProgress();
+    var character = CHARACTER_DEFS[characterId];
+    
+    if (!character) {
+        console.error('Character not found:', characterId);
+        return false;
+    }
+    
+    if (progress.unlockedCharacterIds.indexOf(characterId) !== -1) {
+        console.log('Character already unlocked:', characterId);
+        return false;
+    }
+    
+    if (progress.gemsYellow < character.costGems) {
+        console.log('Not enough gems to unlock:', characterId);
+        return false;
+    }
+    
+    // Check if challenge is completed (if character has one)
+    if (character.challenge && progress.completedChallengeIds.indexOf(character.challenge.id) === -1) {
+        console.log('Challenge not completed for:', characterId);
+        return false;
+    }
+    
+    // Deduct gems and unlock
+    progress.gemsYellow -= character.costGems;
+    progress.unlockedCharacterIds.push(characterId);
+    savePlayerProgress(progress);
+    
+    console.log('Character unlocked:', characterId);
+    return true;
+}
+
+window.getPlayerProgress = getPlayerProgress;
+window.savePlayerProgress = savePlayerProgress;
+window.unlockCharacter = unlockCharacter;
+
+// ===================================
 // MENU SCENE
 // ===================================
 
@@ -114,20 +391,24 @@ class MenuScene extends Phaser.Scene {
             console.log('Loading screen hidden');
         }
         
-        const width = this.cameras.main.width;
-        const height = this.cameras.main.height;
+        this.progress = getPlayerProgress();
+        this.showingCharacterSelect = false;
+        this.interactiveElements = [];
+        
+        var width = this.cameras.main.width;
+        var height = this.cameras.main.height;
         
         // Background
         this.createBackground();
         
         // Title
-        const title = this.add.text(width / 2, height * 0.25, 'SWIPE &\nSURVIVE', {
+        var title = this.add.text(width / 2, height * 0.15, 'SWIPE &\nSURVIVE', {
             fontFamily: 'Rubik, sans-serif',
-            fontSize: '48px',
+            fontSize: '42px',
             fontWeight: '800',
             color: '#ffffff',
             align: 'center',
-            lineSpacing: 10
+            lineSpacing: 8
         }).setOrigin(0.5);
         
         // Title glow animation
@@ -140,36 +421,58 @@ class MenuScene extends Phaser.Scene {
             ease: 'Sine.easeInOut'
         });
         
-        // Subtitle
-        this.add.text(width / 2, height * 0.42, 'A MOBILE ROGUELITE', {
-            fontFamily: 'Inter, sans-serif',
-            fontSize: '14px',
-            fontWeight: '500',
-            color: '#00ffff',
-            letterSpacing: 4
+        // Gems display (top right)
+        this.gemsText = this.add.text(width - 15, 15, '💎 ' + this.progress.gemsYellow, {
+            fontFamily: 'Rubik, sans-serif',
+            fontSize: '18px',
+            fontWeight: '700',
+            color: '#ffdd00'
+        }).setOrigin(1, 0);
+        
+        // Selected character display
+        var selectedChar = CHARACTER_DEFS[this.progress.selectedCharacterId] || CHARACTER_DEFS.starter;
+        this.selectedCharText = this.add.text(width / 2, height * 0.32, selectedChar.icon + ' ' + selectedChar.name, {
+            fontFamily: 'Rubik, sans-serif',
+            fontSize: '20px',
+            fontWeight: '700',
+            color: '#00ffff'
         }).setOrigin(0.5);
         
-        // Play button
-        const playBtn = this.createPlayButton(width / 2, height * 0.6);
-        
-        // How to play
-        this.add.text(width / 2, height * 0.78, 'HOW TO PLAY:', {
+        this.selectedCharDesc = this.add.text(width / 2, height * 0.37, selectedChar.description, {
             fontFamily: 'Inter, sans-serif',
             fontSize: '12px',
+            color: '#888888'
+        }).setOrigin(0.5);
+        
+        // Character select button
+        var self = this;
+        var charSelectBtn = this.createMenuButton(width / 2, height * 0.45, 'SELECT CHARACTER', function() {
+            self.showCharacterSelect();
+        }, 180, 36);
+        this.interactiveElements.push(charSelectBtn);
+        
+        // Play button
+        var playBtn = this.createPlayButton(width / 2, height * 0.58);
+        this.interactiveElements.push(playBtn);
+        
+        // How to play
+        this.add.text(width / 2, height * 0.73, 'HOW TO PLAY:', {
+            fontFamily: 'Inter, sans-serif',
+            fontSize: '11px',
             fontWeight: '600',
             color: '#888888'
         }).setOrigin(0.5);
         
-        this.add.text(width / 2, height * 0.84, '• Swipe anywhere to DASH\n• Auto-attack nearest enemy\n• Survive waves & get upgrades!', {
+        this.add.text(width / 2, height * 0.80, '• Swipe anywhere to DASH\n• Auto-attack nearest enemy\n• Survive waves & get upgrades!', {
             fontFamily: 'Inter, sans-serif',
-            fontSize: '12px',
+            fontSize: '11px',
             color: '#666666',
             align: 'center',
-            lineSpacing: 6
+            lineSpacing: 5
         }).setOrigin(0.5);
         
         // Version
-        this.add.text(width / 2, height - 20, 'v1.0.0', {
+        this.add.text(width / 2, height - 20, 'v1.1.0', {
             fontFamily: 'Inter, sans-serif',
             fontSize: '10px',
             color: '#444444'
@@ -184,7 +487,7 @@ class MenuScene extends Phaser.Scene {
         }).setOrigin(0, 1);
         
         // Initialize audio on first interaction
-        this.input.once('pointerdown', () => {
+        this.input.once('pointerdown', function() {
             if (window.gameAudioManager) {
                 window.gameAudioManager.ensureContext();
             }
@@ -192,20 +495,20 @@ class MenuScene extends Phaser.Scene {
     }
     
     createBackground() {
-        const width = this.cameras.main.width;
-        const height = this.cameras.main.height;
+        var width = this.cameras.main.width;
+        var height = this.cameras.main.height;
         
         // Gradient background
-        const bg = this.add.graphics();
+        var bg = this.add.graphics();
         bg.fillGradientStyle(0x0a0a1a, 0x0a0a1a, 0x1a1a3a, 0x1a1a3a);
         bg.fillRect(0, 0, width, height);
         
         // Animated particles (stars)
-        const reduced = localStorage.getItem('reducedEffects') === 'true';
-        const particleCount = reduced ? 15 : 30;
+        var reduced = localStorage.getItem('reducedEffects') === 'true';
+        var particleCount = reduced ? 15 : 30;
         
-        for (let i = 0; i < particleCount; i++) {
-            const star = this.add.graphics();
+        for (var i = 0; i < particleCount; i++) {
+            var star = this.add.graphics();
             star.fillStyle(0x00ffff, Math.random() * 0.5 + 0.2);
             star.fillCircle(0, 0, Math.random() * 2 + 1);
             star.x = Math.random() * width;
@@ -230,21 +533,58 @@ class MenuScene extends Phaser.Scene {
         }
     }
     
+    createMenuButton(x, y, text, callback, btnWidth, btnHeight) {
+        var container = this.add.container(x, y);
+        var halfW = btnWidth / 2;
+        var halfH = btnHeight / 2;
+        
+        var bg = this.add.graphics();
+        bg.fillStyle(0x333355);
+        bg.fillRoundedRect(-halfW, -halfH, btnWidth, btnHeight, 8);
+        bg.lineStyle(2, 0x5555aa);
+        bg.strokeRoundedRect(-halfW, -halfH, btnWidth, btnHeight, 8);
+        container.add(bg);
+        
+        var label = this.add.text(0, 0, text, {
+            fontFamily: 'Rubik, sans-serif',
+            fontSize: '14px',
+            fontWeight: '700',
+            color: '#ffffff'
+        }).setOrigin(0.5);
+        container.add(label);
+        
+        var hitArea = new Phaser.Geom.Rectangle(-halfW, -halfH, btnWidth, btnHeight);
+        container.setSize(btnWidth, btnHeight);
+        container.setInteractive(hitArea, Phaser.Geom.Rectangle.Contains);
+        
+        var self = this;
+        container.on('pointerdown', function() {
+            console.log('Menu button tapped:', text);
+            container.setScale(0.95);
+            self.time.delayedCall(100, function() {
+                if (container && container.active) container.setScale(1);
+                if (callback) callback();
+            });
+        });
+        
+        return container;
+    }
+    
     createPlayButton(x, y) {
-        const container = this.add.container(x, y);
+        var container = this.add.container(x, y);
         
         // Button background
-        const bg = this.add.graphics();
+        var bg = this.add.graphics();
         bg.fillStyle(0x00aaaa);
-        bg.fillRoundedRect(-80, -30, 160, 60, 15);
+        bg.fillRoundedRect(-80, -28, 160, 56, 14);
         bg.lineStyle(3, 0x00ffff);
-        bg.strokeRoundedRect(-80, -30, 160, 60, 15);
+        bg.strokeRoundedRect(-80, -28, 160, 56, 14);
         container.add(bg);
         
         // Glow effect
-        const glow = this.add.graphics();
+        var glow = this.add.graphics();
         glow.fillStyle(0x00ffff, 0.3);
-        glow.fillRoundedRect(-85, -35, 170, 70, 18);
+        glow.fillRoundedRect(-85, -33, 170, 66, 16);
         container.addAt(glow, 0);
         
         // Pulse animation
@@ -259,46 +599,343 @@ class MenuScene extends Phaser.Scene {
         });
         
         // Text
-        const text = this.add.text(0, 0, 'PLAY', {
+        var text = this.add.text(0, 0, 'PLAY', {
             fontFamily: 'Rubik, sans-serif',
-            fontSize: '28px',
+            fontSize: '26px',
             fontWeight: '800',
             color: '#ffffff'
         }).setOrigin(0.5);
         container.add(text);
         
-        // Make interactive
-        container.setSize(160, 60);
-        container.setInteractive({ useHandCursor: true })
-            .on('pointerover', () => {
-                this.tweens.add({
-                    targets: container,
-                    scaleX: 1.1,
-                    scaleY: 1.1,
-                    duration: 100
-                });
-            })
-            .on('pointerout', () => {
-                this.tweens.add({
-                    targets: container,
-                    scaleX: 1,
-                    scaleY: 1,
-                    duration: 100
-                });
-            })
-            .on('pointerdown', () => {
-                this.startGame();
+        // Make interactive with explicit hit area
+        var hitArea = new Phaser.Geom.Rectangle(-80, -28, 160, 56);
+        container.setSize(160, 56);
+        container.setInteractive(hitArea, Phaser.Geom.Rectangle.Contains);
+        
+        var self = this;
+        container.on('pointerover', function() {
+            self.tweens.add({
+                targets: container,
+                scaleX: 1.1,
+                scaleY: 1.1,
+                duration: 100
             });
+        });
+        
+        container.on('pointerout', function() {
+            self.tweens.add({
+                targets: container,
+                scaleX: 1,
+                scaleY: 1,
+                duration: 100
+            });
+        });
+        
+        container.on('pointerdown', function() {
+            console.log('PLAY button tapped');
+            self.startGame();
+        });
         
         return container;
     }
     
+    showCharacterSelect() {
+        if (this.showingCharacterSelect) return;
+        this.showingCharacterSelect = true;
+        
+        console.log('Showing character select');
+        
+        var width = this.cameras.main.width;
+        var height = this.cameras.main.height;
+        var self = this;
+        
+        // Overlay container
+        this.charSelectContainer = this.add.container(0, 0);
+        this.charSelectContainer.setDepth(1000);
+        this.charSelectButtons = [];
+        
+        // Dark background
+        var overlay = this.add.graphics();
+        overlay.fillStyle(0x000000, 0.9);
+        overlay.fillRect(0, 0, width, height);
+        this.charSelectContainer.add(overlay);
+        
+        // Title
+        var title = this.add.text(width / 2, 30, 'SELECT CHARACTER', {
+            fontFamily: 'Rubik, sans-serif',
+            fontSize: '22px',
+            fontWeight: '800',
+            color: '#ffffff'
+        }).setOrigin(0.5);
+        this.charSelectContainer.add(title);
+        
+        // Gems display
+        var gemsDisplay = this.add.text(width / 2, 55, '💎 ' + this.progress.gemsYellow + ' Gems', {
+            fontFamily: 'Rubik, sans-serif',
+            fontSize: '14px',
+            fontWeight: '700',
+            color: '#ffdd00'
+        }).setOrigin(0.5);
+        this.charSelectContainer.add(gemsDisplay);
+        
+        // Character list (scrollable area)
+        var startY = 85;
+        var cardHeight = 70;
+        var cardSpacing = 8;
+        var cardWidth = width - 30;
+        
+        var charIds = Object.keys(CHARACTER_DEFS);
+        
+        charIds.forEach(function(charId, index) {
+            var character = CHARACTER_DEFS[charId];
+            var y = startY + index * (cardHeight + cardSpacing);
+            
+            var isUnlocked = self.progress.unlockedCharacterIds.indexOf(charId) !== -1;
+            var isSelected = self.progress.selectedCharacterId === charId;
+            var challengeCompleted = !character.challenge || 
+                self.progress.completedChallengeIds.indexOf(character.challenge.id) !== -1;
+            var canUnlock = !isUnlocked && challengeCompleted && self.progress.gemsYellow >= character.costGems;
+            
+            var card = self.createCharacterCard(
+                width / 2, y,
+                cardWidth, cardHeight,
+                character,
+                isUnlocked,
+                isSelected,
+                challengeCompleted,
+                canUnlock
+            );
+            self.charSelectButtons.push(card);
+        });
+        
+        // Close button
+        var closeBtn = this.createCharSelectButton(width / 2, height - 35, 'BACK', function() {
+            self.hideCharacterSelect();
+        }, 120, 40, 0x555577);
+        this.charSelectButtons.push(closeBtn);
+        
+        // Entrance animation
+        this.charSelectContainer.alpha = 0;
+        this.tweens.add({
+            targets: this.charSelectContainer,
+            alpha: 1,
+            duration: 200
+        });
+    }
+    
+    createCharacterCard(x, y, cardWidth, cardHeight, character, isUnlocked, isSelected, challengeCompleted, canUnlock) {
+        var container = this.add.container(x, y);
+        container.setScrollFactor(0);
+        container.setDepth(1001);
+        
+        var halfW = cardWidth / 2;
+        var halfH = cardHeight / 2;
+        
+        // Card background
+        var bg = this.add.graphics();
+        if (isSelected) {
+            bg.fillStyle(0x005555);
+            bg.lineStyle(2, 0x00ffff);
+        } else if (isUnlocked) {
+            bg.fillStyle(0x2a2a4a);
+            bg.lineStyle(1, 0x4a4a6a);
+        } else {
+            bg.fillStyle(0x1a1a2a);
+            bg.lineStyle(1, 0x3a3a4a);
+        }
+        bg.fillRoundedRect(-halfW, -halfH, cardWidth, cardHeight, 8);
+        bg.strokeRoundedRect(-halfW, -halfH, cardWidth, cardHeight, 8);
+        container.add(bg);
+        
+        // Icon
+        var icon = this.add.text(-halfW + 30, 0, character.icon, {
+            fontSize: '28px'
+        }).setOrigin(0.5);
+        if (!isUnlocked) icon.setAlpha(0.5);
+        container.add(icon);
+        
+        // Name
+        var name = this.add.text(-halfW + 60, -halfH + 12, character.name, {
+            fontFamily: 'Rubik, sans-serif',
+            fontSize: '14px',
+            fontWeight: '700',
+            color: isUnlocked ? '#ffffff' : '#888888'
+        }).setOrigin(0, 0);
+        container.add(name);
+        
+        // Description
+        var desc = this.add.text(-halfW + 60, -halfH + 30, character.description, {
+            fontFamily: 'Inter, sans-serif',
+            fontSize: '10px',
+            color: '#aaaaaa'
+        }).setOrigin(0, 0);
+        container.add(desc);
+        
+        // Perk
+        if (character.perkDesc) {
+            var perk = this.add.text(-halfW + 60, -halfH + 45, '⭐ ' + character.perkDesc, {
+                fontFamily: 'Inter, sans-serif',
+                fontSize: '9px',
+                color: '#ffdd00'
+            }).setOrigin(0, 0);
+            container.add(perk);
+        }
+        
+        // Status text (right side)
+        var statusText;
+        if (isSelected) {
+            statusText = this.add.text(halfW - 10, 0, 'SELECTED', {
+                fontFamily: 'Rubik, sans-serif',
+                fontSize: '11px',
+                fontWeight: '700',
+                color: '#00ffff'
+            }).setOrigin(1, 0.5);
+        } else if (isUnlocked) {
+            statusText = this.add.text(halfW - 10, 0, 'TAP TO SELECT', {
+                fontFamily: 'Inter, sans-serif',
+                fontSize: '10px',
+                color: '#666666'
+            }).setOrigin(1, 0.5);
+        } else if (canUnlock) {
+            statusText = this.add.text(halfW - 10, 0, '💎 ' + character.costGems + '\nUNLOCK', {
+                fontFamily: 'Rubik, sans-serif',
+                fontSize: '11px',
+                fontWeight: '700',
+                color: '#ffdd00',
+                align: 'right'
+            }).setOrigin(1, 0.5);
+        } else if (!challengeCompleted) {
+            statusText = this.add.text(halfW - 10, 0, '🔒 ' + character.challenge.desc, {
+                fontFamily: 'Inter, sans-serif',
+                fontSize: '9px',
+                color: '#ff6666',
+                align: 'right'
+            }).setOrigin(1, 0.5);
+        } else {
+            statusText = this.add.text(halfW - 10, 0, '💎 ' + character.costGems + '\nNeed gems', {
+                fontFamily: 'Inter, sans-serif',
+                fontSize: '10px',
+                color: '#888888',
+                align: 'right'
+            }).setOrigin(1, 0.5);
+        }
+        container.add(statusText);
+        
+        // Make interactive
+        var hitArea = new Phaser.Geom.Rectangle(-halfW, -halfH, cardWidth, cardHeight);
+        container.setSize(cardWidth, cardHeight);
+        container.setInteractive(hitArea, Phaser.Geom.Rectangle.Contains);
+        
+        var self = this;
+        container.on('pointerdown', function() {
+            console.log('Character card tapped:', character.id);
+            container.setScale(0.98);
+            self.time.delayedCall(100, function() {
+                if (container && container.active) container.setScale(1);
+            });
+            
+            if (isUnlocked) {
+                // Select this character
+                self.progress.selectedCharacterId = character.id;
+                savePlayerProgress(self.progress);
+                console.log('Character selected:', character.id);
+                self.hideCharacterSelect();
+                self.updateSelectedCharDisplay();
+            } else if (canUnlock) {
+                // Try to unlock
+                if (unlockCharacter(character.id)) {
+                    self.progress = getPlayerProgress();
+                    self.hideCharacterSelect();
+                    self.showCharacterSelect(); // Refresh
+                    self.updateGemsDisplay();
+                }
+            }
+        });
+        
+        return container;
+    }
+    
+    createCharSelectButton(x, y, text, callback, btnWidth, btnHeight, color) {
+        var container = this.add.container(x, y);
+        container.setScrollFactor(0);
+        container.setDepth(1002);
+        
+        var halfW = btnWidth / 2;
+        var halfH = btnHeight / 2;
+        
+        var bg = this.add.graphics();
+        bg.fillStyle(color || 0x333355);
+        bg.fillRoundedRect(-halfW, -halfH, btnWidth, btnHeight, 8);
+        container.add(bg);
+        
+        var label = this.add.text(0, 0, text, {
+            fontFamily: 'Rubik, sans-serif',
+            fontSize: '14px',
+            fontWeight: '700',
+            color: '#ffffff'
+        }).setOrigin(0.5);
+        container.add(label);
+        
+        var hitArea = new Phaser.Geom.Rectangle(-halfW, -halfH, btnWidth, btnHeight);
+        container.setSize(btnWidth, btnHeight);
+        container.setInteractive(hitArea, Phaser.Geom.Rectangle.Contains);
+        
+        var self = this;
+        container.on('pointerdown', function() {
+            container.setScale(0.95);
+            self.time.delayedCall(100, function() {
+                if (container && container.active) container.setScale(1);
+                if (callback) callback();
+            });
+        });
+        
+        return container;
+    }
+    
+    hideCharacterSelect() {
+        console.log('Hiding character select');
+        this.showingCharacterSelect = false;
+        
+        if (this.charSelectButtons) {
+            this.charSelectButtons.forEach(function(btn) {
+                if (btn && btn.destroy) btn.destroy();
+            });
+            this.charSelectButtons = [];
+        }
+        
+        if (this.charSelectContainer) {
+            this.charSelectContainer.destroy();
+            this.charSelectContainer = null;
+        }
+    }
+    
+    updateSelectedCharDisplay() {
+        var selectedChar = CHARACTER_DEFS[this.progress.selectedCharacterId] || CHARACTER_DEFS.starter;
+        if (this.selectedCharText) {
+            this.selectedCharText.setText(selectedChar.icon + ' ' + selectedChar.name);
+        }
+        if (this.selectedCharDesc) {
+            this.selectedCharDesc.setText(selectedChar.description);
+        }
+    }
+    
+    updateGemsDisplay() {
+        if (this.gemsText) {
+            this.gemsText.setText('💎 ' + this.progress.gemsYellow);
+        }
+    }
+    
     startGame() {
+        console.log('Starting game with character:', this.progress.selectedCharacterId);
+        
         // Transition effect
         this.cameras.main.fadeOut(300, 0, 0, 0);
         
-        this.time.delayedCall(300, () => {
-            this.scene.start('GameScene');
+        var selectedCharId = this.progress.selectedCharacterId;
+        var self = this;
+        
+        this.time.delayedCall(300, function() {
+            self.scene.start('GameScene', { selectedCharacterId: selectedCharId });
         });
     }
 }
@@ -312,7 +949,15 @@ class GameScene extends Phaser.Scene {
         super({ key: 'GameScene' });
     }
     
-    init() {
+    init(data) {
+        console.log('GameScene.init() with data:', data);
+        
+        // Character selection
+        this.selectedCharacterId = (data && data.selectedCharacterId) || 
+            localStorage.getItem('selectedCharacterId') || 'starter';
+        this.selectedCharacter = CHARACTER_DEFS[this.selectedCharacterId] || CHARACTER_DEFS.starter;
+        console.log('Selected character:', this.selectedCharacter.name);
+        
         // Game state
         this.wave = 0;
         this.waveTimer = 0;
@@ -329,6 +974,9 @@ class GameScene extends Phaser.Scene {
         // XP Currency - single source of truth for upgrade purchases
         this.xpCurrency = 0;
         
+        // Character perk: extra rerolls
+        this.extraRerolls = this.selectedCharacter.perk === 'extra_rerolls' ? 2 : 0;
+        
         // Spawn tracking
         this.lastSpawnTime = 0;
         this.spawnInterval = 2000;
@@ -339,6 +987,8 @@ class GameScene extends Phaser.Scene {
     }
     
     create() {
+        console.log('GameScene.create() called');
+        
         // Setup camera and world
         this.cameras.main.fadeIn(300);
         this.cameras.main.setBackgroundColor(0x0a0a1a);
@@ -352,6 +1002,9 @@ class GameScene extends Phaser.Scene {
         
         // Upgrade manager
         this.upgradeManager = new UpgradeManager();
+        
+        // Apply character stat modifiers to upgrade manager base stats
+        this.applyCharacterModifiers();
         
         // Create arena
         this.createArena();
@@ -367,8 +1020,9 @@ class GameScene extends Phaser.Scene {
         this.pickupObjects = [];
         this.dashTrails = this.physics.add.group();
         
-        // Create player at center
+        // Create player at center with character modifiers
         this.player = new Player(this, this.arenaWidth / 2, this.arenaHeight / 2);
+        this.applyCharacterToPlayer();
         
         // Setup camera to follow player
         this.cameras.main.startFollow(this.player.container, true, 0.1, 0.1);
@@ -401,8 +1055,94 @@ class GameScene extends Phaser.Scene {
         this.playerInvulnTime = 0;
         this.playerInvulnDuration = 400; // ms of i-frames after taking damage
         
+        // Start regen timer for Survivor perk
+        if (this.selectedCharacter.perk === 'regen') {
+            this.startRegenTimer();
+        }
+        
         // Start first wave
         this.startWave();
+    }
+    
+    /**
+     * Apply character stat modifiers to upgrade manager
+     */
+    applyCharacterModifiers() {
+        var charStats = this.selectedCharacter.stats;
+        var um = this.upgradeManager.stats;
+        
+        // Apply multipliers
+        um.maxHp = Math.round(um.maxHp * (charStats.maxHpMult || 1));
+        um.damage = um.damage * (charStats.damageMult || 1);
+        um.fireRate = um.fireRate * (charStats.fireRateMult || 1);
+        um.magnetRange = um.magnetRange * (charStats.pickupRangeMult || 1);
+        um.xpGainMultiplier = um.xpGainMultiplier * (charStats.xpGainMult || 1);
+        
+        // Store character multipliers for runtime use
+        this.charMoveSpeedMult = charStats.moveSpeedMult || 1;
+        this.charDashCooldownMult = charStats.dashCooldownMult || 1;
+        
+        // Character perks
+        if (this.selectedCharacter.perk === 'crit_boost') {
+            um.critChance = (um.critChance || 0) + 0.1;
+        }
+        if (this.selectedCharacter.perk === 'pierce') {
+            um.pierceCount = (um.pierceCount || 0) + 1;
+        }
+        if (this.selectedCharacter.perk === 'extra_projectile') {
+            um.extraProjectiles = (um.extraProjectiles || 0) + 1;
+        }
+        if (this.selectedCharacter.perk === 'dash_trail') {
+            um.dashTrailDamage = (um.dashTrailDamage || 0) + 15;
+        }
+        
+        console.log('Character modifiers applied:', um);
+    }
+    
+    /**
+     * Apply character stats to player object
+     */
+    applyCharacterToPlayer() {
+        if (!this.player) return;
+        
+        var stats = this.selectedCharacter.stats;
+        
+        // Apply max HP modifier
+        this.player.maxHp = Math.round(this.player.maxHp * (stats.maxHpMult || 1));
+        this.player.hp = this.player.maxHp;
+        
+        // Apply speed modifier
+        this.player.speed = this.player.speed * (stats.moveSpeedMult || 1);
+        
+        // Apply dash cooldown modifier
+        this.player.dashCooldown = Math.round(this.player.dashCooldown * (stats.dashCooldownMult || 1));
+        
+        console.log('Player stats after character modifiers:', {
+            hp: this.player.hp,
+            maxHp: this.player.maxHp,
+            speed: this.player.speed,
+            dashCooldown: this.player.dashCooldown
+        });
+    }
+    
+    /**
+     * Regen timer for Survivor perk
+     */
+    startRegenTimer() {
+        var self = this;
+        this.regenTimer = this.time.addEvent({
+            delay: 3000, // Every 3 seconds
+            callback: function() {
+                if (self.player && !self.gameOver && !self.isPaused) {
+                    var maxHp = self.upgradeManager.stats.maxHp || self.player.maxHp;
+                    if (self.player.hp < maxHp) {
+                        self.player.hp = Math.min(self.player.hp + 1, maxHp);
+                        console.log('Regen +1 HP, now:', self.player.hp);
+                    }
+                }
+            },
+            loop: true
+        });
     }
     
     /**
@@ -473,6 +1213,15 @@ class GameScene extends Phaser.Scene {
         // Play hit sound
         if (this.audioManager) {
             this.audioManager.playHit();
+        }
+        
+        // Thorns perk: reflect 10% damage to attacker (Tank character)
+        if (this.selectedCharacter && this.selectedCharacter.perk === 'thorns' && source) {
+            var thornsDamage = Math.round(amount * 0.1);
+            if (thornsDamage > 0 && source.takeDamage) {
+                source.takeDamage(thornsDamage, null, false);
+                console.log('Thorns reflected', thornsDamage, 'damage to enemy');
+            }
         }
         
         // Log damage for debugging
@@ -1257,9 +2006,22 @@ class GameScene extends Phaser.Scene {
         // Reset rerolls for this intermission
         this.upgradeManager.resetRerolls();
         
+        // Add extra rerolls from Gambler perk
+        if (this.extraRerolls > 0) {
+            this.upgradeManager.rerollsLeft = (this.upgradeManager.rerollsLeft || 1) + this.extraRerolls;
+            console.log('Gambler perk: added', this.extraRerolls, 'extra rerolls');
+        }
+        
+        // Calculate number of upgrade choices (Scholar perk adds 1)
+        var choiceCount = 3;
+        if (this.selectedCharacter && this.selectedCharacter.perk === 'extra_upgrade_choice') {
+            choiceCount = 4;
+            console.log('Scholar perk: showing 4 upgrade choices');
+        }
+        
         // Show upgrade selection with XP currency system
         console.log('Showing upgrade selection UI, XP currency:', this.xpCurrency);
-        var choices = this.upgradeManager.getRandomChoices(3);
+        var choices = this.upgradeManager.getRandomChoices(choiceCount);
         var self = this;
         
         // Pass scene reference for XP access
