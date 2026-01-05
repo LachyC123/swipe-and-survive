@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="theme-color" content="#0a0a1a">
+    <title>Swipe & Survive</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:wght@400;500;600;700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Error Overlay for Mobile Debugging -->
+    <div id="error-overlay" class="error-overlay hidden">
+        <div class="error-content">
+            <h2>⚠️ Error Detected</h2>
+            <pre id="error-message"></pre>
+            <div class="error-buttons">
+                <button id="copy-error-btn">Copy Error</button>
+                <button id="dismiss-error-btn">Dismiss</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Loading Screen -->
+    <div id="loading-screen" class="loading-screen">
+        <div class="loading-content">
+            <h1 class="loading-title">SWIPE & SURVIVE</h1>
+            <div class="loading-bar">
+                <div class="loading-progress" id="loading-progress"></div>
+            </div>
+            <p class="loading-text">Loading...</p>
+        </div>
+    </div>
+    
+    <!-- Game Container -->
+    <div id="game-container"></div>
+    
+    <!-- Phaser 3 via CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
+    
+    <!-- Game Scripts (order matters) -->
+    <script src="src/upgrades.js"></script>
+    <script src="src/entities.js"></script>
+    <script src="src/ui.js"></script>
+    <script src="src/game.js"></script>
+    <script src="src/main.js"></script>
+    
+    <!-- Error Handler -->
+    <script>
+        // Global error handling for mobile debugging
+        (function() {
+            const errorOverlay = document.getElementById('error-overlay');
+            const errorMessage = document.getElementById('error-message');
+            const copyBtn = document.getElementById('copy-error-btn');
+            const dismissBtn = document.getElementById('dismiss-error-btn');
+            
+            let errorLog = [];
+            
+            function showError(msg, source, line, col, error) {
+                const errorText = `${msg}\n\nSource: ${source || 'unknown'}\nLine: ${line || '?'}, Col: ${col || '?'}\n\n${error ? error.stack : ''}`;
+                errorLog.push(errorText);
+                errorMessage.textContent = errorText;
+                errorOverlay.classList.remove('hidden');
+            }
+            
+            window.onerror = function(msg, source, line, col, error) {
+                showError(msg, source, line, col, error);
+                return false;
+            };
+            
+            window.addEventListener('unhandledrejection', function(event) {
+                showError('Unhandled Promise Rejection: ' + event.reason, '', '', '', event.reason);
+            });
+            
+            copyBtn.addEventListener('click', function() {
+                navigator.clipboard.writeText(errorLog.join('\n\n---\n\n')).then(() => {
+                    copyBtn.textContent = 'Copied!';
+                    setTimeout(() => copyBtn.textContent = 'Copy Error', 2000);
+                });
+            });
+            
+            dismissBtn.addEventListener('click', function() {
+                errorOverlay.classList.add('hidden');
+            });
+        })();
+    </script>
+</body>
+</html>
