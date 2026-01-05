@@ -7,6 +7,8 @@
  * Uses Phaser Graphics for procedural art (no external assets).
  */
 
+console.log('entities.js loading...');
+
 // ===================================
 // PLAYER CLASS
 // ===================================

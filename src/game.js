@@ -6,6 +6,8 @@
  * Contains MenuScene, GameScene, and related logic.
  */
 
+console.log('game.js loading...');
+
 // ===================================
 // AUDIO MANAGER
 // ===================================
@@ -99,9 +101,19 @@ class AudioManager {
 class MenuScene extends Phaser.Scene {
     constructor() {
         super({ key: 'MenuScene' });
+        console.log('MenuScene constructor called');
     }
     
     create() {
+        console.log('MenuScene.create() called');
+        
+        // Hide loading screen immediately
+        var loadingScreen = document.getElementById('loading-screen');
+        if (loadingScreen) {
+            loadingScreen.classList.add('hidden');
+            console.log('Loading screen hidden');
+        }
+        
         const width = this.cameras.main.width;
         const height = this.cameras.main.height;
         
@@ -162,12 +174,6 @@ class MenuScene extends Phaser.Scene {
             fontSize: '10px',
             color: '#444444'
         }).setOrigin(0.5);
-        
-        // Hide loading screen
-        const loadingScreen = document.getElementById('loading-screen');
-        if (loadingScreen) {
-            loadingScreen.classList.add('hidden');
-        }
         
         // Initialize audio on first interaction
         this.input.once('pointerdown', () => {
@@ -1034,7 +1040,9 @@ class GameScene extends Phaser.Scene {
     }
 }
 
-// Export scenes
+// Export scenes to window for Phaser config
 window.AudioManager = AudioManager;
 window.MenuScene = MenuScene;
 window.GameScene = GameScene;
+
+console.log('game.js loaded - MenuScene:', typeof MenuScene, 'GameScene:', typeof GameScene);
