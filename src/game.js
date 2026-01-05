@@ -175,6 +175,14 @@ class MenuScene extends Phaser.Scene {
             color: '#444444'
         }).setOrigin(0.5);
         
+        // Build label (bottom-left)
+        var buildDate = new Date().toISOString().slice(0, 16).replace('T', ' ');
+        this.add.text(10, height - 15, 'BUILD: ' + buildDate, {
+            fontFamily: 'monospace',
+            fontSize: '9px',
+            color: '#333333'
+        }).setOrigin(0, 1);
+        
         // Initialize audio on first interaction
         this.input.once('pointerdown', () => {
             if (window.gameAudioManager) {

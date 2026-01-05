@@ -132,6 +132,15 @@ class GameHUD {
         }).setOrigin(0.5);
         this.container.add(this.dashText);
         
+        // Build label (bottom-left)
+        var buildDate = new Date().toISOString().slice(0, 16).replace('T', ' ');
+        var buildLabel = this.scene.add.text(10, height - 10, 'BUILD: ' + buildDate, {
+            fontFamily: 'monospace',
+            fontSize: '9px',
+            color: '#444444'
+        }).setOrigin(0, 1);
+        this.container.add(buildLabel);
+        
         // Pause button (top right corner)
         this.pauseBtn = this.createButton(width - 50, padding + 55, '⚙️', () => {
             this.scene.showPauseMenu();
