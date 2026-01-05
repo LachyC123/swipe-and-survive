@@ -1207,18 +1207,25 @@ class GameScene extends Phaser.Scene {
         this.upgradeManager.resetRerolls();
         
         // Show upgrade selection
+        console.log('Showing upgrade selection UI');
         const choices = this.upgradeManager.getRandomChoices(3);
-        this.upgradeUI.show(choices, this.upgradeManager, (upgrade) => {
-            this.upgradeManager.applyUpgrade(upgrade.id);
+        var self = this;
+        this.upgradeUI.show(choices, this.upgradeManager, function(upgrade) {
+            console.log('Upgrade callback received:', upgrade.id, upgrade.name);
+            
+            // Apply the upgrade
+            self.upgradeManager.applyUpgrade(upgrade.id);
+            console.log('Upgrade applied:', upgrade.id);
             
             // Update player max HP if needed
-            const stats = this.upgradeManager.stats;
-            if (stats.maxHp > this.player.maxHp) {
-                this.player.maxHp = stats.maxHp;
+            var stats = self.upgradeManager.stats;
+            if (stats.maxHp > self.player.maxHp) {
+                self.player.maxHp = stats.maxHp;
             }
             
-            // Start next wave
-            this.startWave();
+            // Resume gameplay - start next wave
+            console.log('Starting next wave, isIntermission will be set to false');
+            self.startWave();
         });
     }
     
