@@ -28,8 +28,8 @@ class Player {
         this.baseDamage = 20;
         this.attackCooldown = 500; // ms
         this.lastAttackTime = 0;
-        this.dashCooldown = 800;
-        this.lastDashTime = 0;
+        this.dashCooldown = 600; // Reduced from 800ms for better feel
+        this.lastDashTime = -1000; // Allow immediate first dash
         this.dashSpeed = 500;
         this.dashDuration = 150;
         
@@ -427,12 +427,12 @@ class Player {
     takeDamage(amount, source) {
         if (this.isInvulnerable) return false;
         
-        const stats = this.scene.upgradeManager?.stats || {};
+        const stats = (this.scene && this.scene.upgradeManager) ? this.scene.upgradeManager.stats : {};
         
         // Check barrier first
         if (this.hasBarrier) {
             this.hasBarrier = false;
-            this.barrierVisual.visible = false;
+            if (this.barrierVisual) this.barrierVisual.visible = false;
             this.barrierTimer = 0;
             this.createHitFlash(0xffff00);
             return false;
@@ -448,20 +448,48 @@ class Player {
         this.hp -= amount;
         this.createHitFlash(0xff0000);
         
+        // Brief invulnerability after taking damage (300ms)
+        this.isInvulnerable = true;
+        var self = this;
+        try {
+            this.scene.time.delayedCall(300, function() {
+                // Only reset if not dashing (dash has its own invuln)
+                if (self && !self.isDashing) {
+                    self.isInvulnerable = false;
+                }
+            });
+        } catch(e) {
+            // Fallback: reset after timeout
+            setTimeout(function() { if (self) self.isInvulnerable = false; }, 300);
+        }
+        
+        // Knockback from damage source
+        if (source && source.container && this.body) {
+            var knockDir = Math.atan2(
+                this.container.y - source.container.y,
+                this.container.x - source.container.x
+            );
+            var knockForce = 150;
+            this.body.setVelocity(
+                Math.cos(knockDir) * knockForce,
+                Math.sin(knockDir) * knockForce
+            );
+        }
+        
         // Thorns damage
-        if (stats.thornsPercent > 0 && source) {
-            const thornsDamage = amount * stats.thornsPercent;
+        if (stats && stats.thornsPercent > 0 && source && source.takeDamage) {
+            var thornsDamage = amount * stats.thornsPercent;
             source.takeDamage(thornsDamage, null, false);
         }
         
         // Screen shake
-        const reduced = localStorage.getItem('reducedEffects') === 'true';
-        if (!reduced) {
+        var reduced = localStorage.getItem('reducedEffects') === 'true';
+        if (!reduced && this.scene && this.scene.cameras) {
             this.scene.cameras.main.shake(100, 0.01);
         }
         
         // Play hit sound
-        if (this.scene.audioManager) {
+        if (this.scene && this.scene.audioManager) {
             this.scene.audioManager.playHit();
         }
         
@@ -1552,12 +1580,19 @@ class Projectile {
         this.isCrit = options.isCrit || false;
         this.hitEnemies = new Set();
         this.sizeMultiplier = options.sizeMultiplier || 1;
+        this.active = true;
+        
+        // Store velocity for manual movement
+        this.vx = Math.cos(angle) * speed;
+        this.vy = Math.sin(angle) * speed;
         
         // Create visual
         this.graphics = scene.add.graphics();
         this.graphics.x = x;
         this.graphics.y = y;
         this.graphics.setDepth(80);
+        
+        var size = isEnemy ? 6 : (5 * this.sizeMultiplier);
         
         if (isEnemy) {
             // Enemy projectile (purple/pink)
@@ -1567,32 +1602,44 @@ class Projectile {
             this.graphics.fillCircle(0, 0, 3);
         } else {
             // Player projectile (cyan)
-            const size = 5 * this.sizeMultiplier;
             this.graphics.fillStyle(this.isCrit ? 0xffff00 : 0x00ffff);
             this.graphics.fillCircle(0, 0, size);
             this.graphics.fillStyle(0xffffff, 0.8);
             this.graphics.fillCircle(0, 0, size * 0.5);
         }
         
-        // Physics
+        // Physics - add to graphics with proper offset for circle
         scene.physics.add.existing(this.graphics);
         this.body = this.graphics.body;
-        this.body.setCircle(6 * this.sizeMultiplier);
+        // Set circular body with offset so it's centered on the drawn circle
+        this.body.setCircle(size, -size, -size);
         
-        // Set velocity
-        this.body.setVelocity(
-            Math.cos(angle) * speed,
-            Math.sin(angle) * speed
-        );
+        // Set velocity on physics body
+        this.body.setVelocity(this.vx, this.vy);
         
-        // Destroy after time
+        // Destroy after time (2 seconds lifespan)
         this.destroyTimer = scene.time.delayedCall(2000, () => this.destroy());
     }
     
-    update() {
+    update(delta) {
+        if (!this.active || !this.graphics) return;
+        
+        // Safeguard: ensure body velocity is maintained (physics should handle this)
+        // But also manually update position as fallback for Graphics objects
+        if (this.body) {
+            // Re-apply velocity if it got reset (shouldn't happen but safeguard)
+            if (Math.abs(this.body.velocity.x) < 1 && Math.abs(this.body.velocity.y) < 1) {
+                this.body.setVelocity(this.vx, this.vy);
+            }
+        }
+        
         // Check if out of bounds
-        if (this.graphics.x < -50 || this.graphics.x > this.scene.arenaWidth + 50 ||
-            this.graphics.y < -50 || this.graphics.y > this.scene.arenaHeight + 50) {
+        var gx = this.graphics.x || 0;
+        var gy = this.graphics.y || 0;
+        var arenaW = this.scene.arenaWidth || 800;
+        var arenaH = this.scene.arenaHeight || 600;
+        
+        if (gx < -50 || gx > arenaW + 50 || gy < -50 || gy > arenaH + 50) {
             this.destroy();
         }
     }
