@@ -469,6 +469,11 @@ class UpgradeSelectionUI {
     }
     
     show(choices, upgradeManager, gameScene, callback) {
+        console.log('=== UPGRADE UI SHOW ===');
+        console.log('XP Currency:', gameScene.xpCurrency);
+        console.log('Wave:', gameScene.wave);
+        console.log('Choices:', choices.map(function(c) { return c ? c.id : 'null'; }));
+        
         this.selectedCallback = callback;
         this.selectionMade = false;
         this.gameScene = gameScene; // Store for XP access
@@ -477,11 +482,17 @@ class UpgradeSelectionUI {
         var width = this.scene.cameras.main.width;
         var height = this.scene.cameras.main.height;
         
+        // Destroy any existing container first
+        if (this.container) {
+            this.container.destroy();
+            this.container = null;
+        }
+        
         this.container = this.scene.add.container(0, 0);
         this.container.setDepth(2000);
         this.container.setScrollFactor(0);
         
-        // Darkened background
+        // Darkened background - explicitly NOT interactive
         var overlay = this.scene.add.graphics();
         overlay.fillStyle(0x000000, 0.85);
         overlay.fillRect(0, 0, width, height);
@@ -568,10 +579,23 @@ class UpgradeSelectionUI {
             alpha: 1,
             duration: 300
         });
+        
+        // DEBUG: Add scene-level input listener to verify events are received
+        var debugInputHandler = function(pointer) {
+            console.log('SCENE POINTERDOWN at:', Math.round(pointer.x), Math.round(pointer.y));
+        };
+        this.scene.input.on('pointerdown', debugInputHandler);
+        
+        // Store for cleanup
+        this.debugInputHandler = debugInputHandler;
+        
+        console.log('Upgrade UI fully initialized, waiting for input...');
     }
     
     createUpgradeCard(x, y, width, height, upgrade, upgradeManager, index, currentXP, currentWave) {
         var container = this.scene.add.container(x, y);
+        container.setScrollFactor(0); // Match parent container
+        container.setDepth(2001); // Above overlay
         
         var currentLevel = upgradeManager.getUpgradeLevel(upgrade.id);
         var isMaxed = currentLevel >= upgrade.maxLevel;
@@ -664,7 +688,7 @@ class UpgradeSelectionUI {
         }
         container.add(costText);
         
-        // Make interactive
+        // Make interactive with explicit hit area
         var hitArea = new Phaser.Geom.Rectangle(-width / 2, -height / 2, width, height);
         container.setSize(width, height);
         container.setInteractive(hitArea, Phaser.Geom.Rectangle.Contains);
@@ -672,9 +696,13 @@ class UpgradeSelectionUI {
         var self = this;
         var upgradeData = upgrade;
         var upgradeCost = cost;
+        var cardWave = currentWave;
         
         container.on('pointerover', function() {
-            if (canAfford && !self.selectionMade) {
+            // Check affordability in real-time
+            var currentXPNow = self.gameScene ? self.gameScene.xpCurrency : 0;
+            var canAffordNow = currentXPNow >= upgradeCost && !isMaxed;
+            if (canAffordNow && !self.selectionMade) {
                 self.scene.tweens.add({
                     targets: container,
                     scaleX: 1.08,
@@ -694,19 +722,56 @@ class UpgradeSelectionUI {
         });
         
         container.on('pointerdown', function() {
-            console.log('Card clicked:', upgradeData.id, 'canAfford:', canAfford);
-            
-            // Visual feedback
-            container.setScale(0.95);
-            self.scene.time.delayedCall(100, function() {
-                if (container.active) container.setScale(1);
-            });
-            
-            if (canAfford && !self.selectionMade) {
-                self.debugSelectText.setText('Selected: ' + upgradeData.id + ' (-' + upgradeCost + ' XP)');
+            try {
+                // Re-check XP in real-time (not from closure)
+                var currentXPNow = self.gameScene ? self.gameScene.xpCurrency : 0;
+                var canAffordNow = currentXPNow >= upgradeCost && !isMaxed;
+                
+                console.log('=== UPGRADE CARD CLICKED ===');
+                console.log('Upgrade:', upgradeData.id, upgradeData.name);
+                console.log('Cost:', upgradeCost, 'Current XP:', currentXPNow);
+                console.log('Can afford:', canAffordNow, 'Is maxed:', isMaxed);
+                console.log('Selection already made:', self.selectionMade);
+                console.log('gameScene ref:', self.gameScene ? 'valid' : 'NULL');
+                
+                // Visual feedback
+                container.setScale(0.95);
+                self.scene.time.delayedCall(100, function() {
+                    if (container && container.active) container.setScale(1);
+                });
+                
+                if (self.selectionMade) {
+                    console.log('BLOCKED: Selection already made');
+                    return;
+                }
+                
+                if (isMaxed) {
+                    console.log('BLOCKED: Upgrade is maxed');
+                    if (self.debugSelectText) {
+                        self.debugSelectText.setText('MAXED: ' + upgradeData.id);
+                    }
+                    return;
+                }
+                
+                if (!canAffordNow) {
+                    console.log('BLOCKED: Cannot afford (need ' + upgradeCost + ', have ' + currentXPNow + ')');
+                    if (self.debugSelectText) {
+                        self.debugSelectText.setText('Need ' + (upgradeCost - currentXPNow) + ' more XP');
+                    }
+                    return;
+                }
+                
+                // All checks passed - select the upgrade
+                console.log('SELECTING upgrade:', upgradeData.id);
+                if (self.debugSelectText) {
+                    self.debugSelectText.setText('Selected: ' + upgradeData.id + ' (-' + upgradeCost + ' XP)');
+                }
                 self.selectUpgrade(upgradeData, upgradeCost);
-            } else if (!canAfford) {
-                self.debugSelectText.setText('Cannot afford ' + upgradeData.id + ' (need ' + cost + ' XP)');
+            } catch (err) {
+                console.error('ERROR in upgrade card click handler:', err);
+                if (self.debugSelectText) {
+                    self.debugSelectText.setText('ERROR: ' + err.message);
+                }
             }
         });
         
@@ -727,6 +792,8 @@ class UpgradeSelectionUI {
     
     createSkipButton(x, y) {
         var container = this.scene.add.container(x, y);
+        container.setScrollFactor(0);
+        container.setDepth(2001);
         
         var bg = this.scene.add.graphics();
         bg.fillStyle(0x444455);
@@ -748,13 +815,25 @@ class UpgradeSelectionUI {
         
         var self = this;
         container.on('pointerdown', function() {
-            console.log('Skip button clicked');
+            console.log('=== SKIP BUTTON CLICKED ===');
+            console.log('Selection already made:', self.selectionMade);
+            
             container.setScale(0.95);
-            if (!self.selectionMade) {
-                self.selectionMade = true;
-                self.debugSelectText.setText('Skipped upgrade');
-                self.closeAndContinue(null, 0);
+            self.scene.time.delayedCall(100, function() {
+                if (container && container.active) container.setScale(1);
+            });
+            
+            if (self.selectionMade) {
+                console.log('BLOCKED: Selection already made');
+                return;
             }
+            
+            self.selectionMade = true;
+            console.log('SKIPPING - closing menu');
+            if (self.debugSelectText) {
+                self.debugSelectText.setText('Skipped upgrade');
+            }
+            self.closeAndContinue(null, 0);
         });
         
         container.on('pointerover', function() {
@@ -770,6 +849,8 @@ class UpgradeSelectionUI {
     
     createRerollButton(x, y, currentXP, rerollCost) {
         var container = this.scene.add.container(x, y);
+        container.setScrollFactor(0);
+        container.setDepth(2001);
         var cost = rerollCost || BASE_REROLL_COST;
         var canAfford = currentXP >= cost;
         
@@ -794,19 +875,49 @@ class UpgradeSelectionUI {
         var self = this;
         var rerollCostLocal = cost;
         container.on('pointerdown', function() {
-            console.log('Reroll clicked, canAfford:', canAfford, 'cost:', rerollCostLocal);
-            container.setScale(0.95);
+            // Re-check XP in real-time
+            var currentXPNow = self.gameScene ? self.gameScene.xpCurrency : 0;
+            var canAffordNow = currentXPNow >= rerollCostLocal;
             
-            if (canAfford && !self.selectionMade) {
-                // Deduct XP
-                self.gameScene.xpCurrency -= rerollCostLocal;
-                self.debugSelectText.setText('Rerolled (-' + rerollCostLocal + ' XP)');
-                
-                // Hide and show new choices
-                self.hide();
-                var newChoices = self.upgradeManager.getRandomChoices(3);
-                self.show(newChoices, self.upgradeManager, self.gameScene, self.selectedCallback);
+            console.log('=== REROLL BUTTON CLICKED ===');
+            console.log('Reroll cost:', rerollCostLocal, 'Current XP:', currentXPNow);
+            console.log('Can afford:', canAffordNow);
+            console.log('Selection already made:', self.selectionMade);
+            
+            container.setScale(0.95);
+            self.scene.time.delayedCall(100, function() {
+                if (container && container.active) container.setScale(1);
+            });
+            
+            if (self.selectionMade) {
+                console.log('BLOCKED: Selection already made');
+                return;
             }
+            
+            if (!canAffordNow) {
+                console.log('BLOCKED: Cannot afford reroll');
+                if (self.debugSelectText) {
+                    self.debugSelectText.setText('Need ' + (rerollCostLocal - currentXPNow) + ' more XP to reroll');
+                }
+                return;
+            }
+            
+            // Deduct XP and reroll
+            console.log('REROLLING - deducting', rerollCostLocal, 'XP');
+            self.gameScene.xpCurrency -= rerollCostLocal;
+            if (self.debugSelectText) {
+                self.debugSelectText.setText('Rerolled (-' + rerollCostLocal + ' XP)');
+            }
+            
+            // Store callback before destroying
+            var savedCallback = self.selectedCallback;
+            var savedUpgradeManager = self.upgradeManager;
+            var savedGameScene = self.gameScene;
+            
+            // Hide and show new choices
+            self.hide();
+            var newChoices = savedUpgradeManager.getRandomChoices(3);
+            self.show(newChoices, savedUpgradeManager, savedGameScene, savedCallback);
         });
         
         container.on('pointerover', function() {
@@ -821,33 +932,57 @@ class UpgradeSelectionUI {
     }
     
     selectUpgrade(upgrade, cost) {
+        console.log('=== selectUpgrade CALLED ===');
+        console.log('Upgrade:', upgrade ? upgrade.id : 'null');
+        console.log('Cost:', cost);
+        console.log('selectionMade flag:', this.selectionMade);
+        
         if (this.selectionMade) {
-            console.log('Selection already made');
+            console.log('BLOCKED: selectionMade is already true');
             return;
         }
         this.selectionMade = true;
-        
-        console.log('selectUpgrade:', upgrade.id, 'cost:', cost);
         
         if (this.scene.audioManager) {
             this.scene.audioManager.playLevelUp();
         }
         
+        console.log('Calling closeAndContinue...');
         this.closeAndContinue(upgrade, cost);
     }
     
     closeAndContinue(upgrade, cost) {
+        console.log('=== closeAndContinue CALLED ===');
+        console.log('Upgrade:', upgrade ? upgrade.id : 'SKIP');
+        console.log('Cost:', cost);
+        console.log('Has callback:', this.selectedCallback ? 'YES' : 'NO');
+        console.log('Has container:', this.container ? 'YES' : 'NO');
+        
         var callback = this.selectedCallback;
         var self = this;
         
+        if (!this.container) {
+            console.log('ERROR: No container to animate!');
+            if (callback) {
+                console.log('Calling callback directly...');
+                callback(upgrade, cost);
+            }
+            return;
+        }
+        
+        console.log('Starting fade-out animation...');
         this.scene.tweens.add({
             targets: this.container,
             alpha: 0,
             duration: 200,
             onComplete: function() {
+                console.log('Fade-out complete, hiding UI...');
                 self.hide();
                 if (callback) {
+                    console.log('Calling game callback with upgrade:', upgrade ? upgrade.id : 'SKIP');
                     callback(upgrade, cost);
+                } else {
+                    console.log('WARNING: No callback to call!');
                 }
             }
         });
@@ -855,6 +990,13 @@ class UpgradeSelectionUI {
     
     hide() {
         console.log('UpgradeSelectionUI.hide()');
+        
+        // Remove debug input listener
+        if (this.debugInputHandler) {
+            this.scene.input.off('pointerdown', this.debugInputHandler);
+            this.debugInputHandler = null;
+        }
+        
         if (this.container) {
             this.container.destroy();
             this.container = null;
