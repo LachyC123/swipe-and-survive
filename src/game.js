@@ -375,10 +375,17 @@ class GameScene extends Phaser.Scene {
         this.cameras.main.setBounds(0, 0, this.arenaWidth, this.arenaHeight);
         this.cameras.main.setZoom(1);
         
-        // Create UI
+        // Create UI (guard against duplicates)
+        if (this.hud) this.hud.destroy();
         this.hud = new GameHUD(this);
+        
+        if (this.upgradeUI) this.upgradeUI.hide();
         this.upgradeUI = new UpgradeSelectionUI(this);
+        
+        if (this.pauseMenu) this.pauseMenu.hide();
         this.pauseMenu = new PauseMenu(this);
+        
+        if (this.gameOverScreen) this.gameOverScreen.hide();
         this.gameOverScreen = new GameOverScreen(this);
         
         // Setup input
@@ -387,23 +394,8 @@ class GameScene extends Phaser.Scene {
         // Setup collisions
         this.setupCollisions();
         
-        // Debug HP text (top-left, always visible)
-        this.debugHpText = this.add.text(10, 10, 'HP: 100/100 | XP: 0 | Invuln: false', {
-            fontFamily: 'monospace',
-            fontSize: '12px',
-            color: '#00ff00',
-            backgroundColor: '#000000cc',
-            padding: { x: 5, y: 3 }
-        }).setScrollFactor(0).setDepth(9999);
-        
-        // Active upgrades display (below HP)
-        this.debugUpgradesText = this.add.text(10, 35, 'Upgrades: none', {
-            fontFamily: 'monospace',
-            fontSize: '10px',
-            color: '#88ffff',
-            backgroundColor: '#000000cc',
-            padding: { x: 5, y: 2 }
-        }).setScrollFactor(0).setDepth(9999);
+        // Debug mode flag (press G to toggle)
+        this.debugMode = false;
         
         // Player damage invulnerability tracking
         this.playerInvulnTime = 0;
@@ -873,35 +865,6 @@ class GameScene extends Phaser.Scene {
             this.xpCurrency
         );
         
-        // Update debug HP text every frame
-        if (this.debugHpText && this.player) {
-            var stats = this.upgradeManager ? this.upgradeManager.stats : {};
-            var maxHp = stats.maxHp || this.player.maxHp || 100;
-            var currentHp = Math.ceil(this.player.hp);
-            var invuln = this.player.isInvulnerable || this.player.isDashing;
-            this.debugHpText.setText('HP: ' + currentHp + '/' + maxHp + ' | XP: ' + this.xpCurrency + ' | Invuln: ' + invuln);
-            // Color based on HP
-            if (currentHp <= maxHp * 0.25) {
-                this.debugHpText.setColor('#ff4444');
-            } else if (currentHp <= maxHp * 0.5) {
-                this.debugHpText.setColor('#ffff44');
-            } else {
-                this.debugHpText.setColor('#44ff44');
-            }
-        }
-        
-        // Update active upgrades display
-        if (this.debugUpgradesText && this.upgradeManager) {
-            var acquired = this.upgradeManager.getAcquiredList();
-            if (acquired.length > 0) {
-                var upgradeStr = acquired.map(function(u) { 
-                    return u.icon + u.currentLevel; 
-                }).join(' ');
-                this.debugUpgradesText.setText('Upgrades: ' + upgradeStr);
-            } else {
-                this.debugUpgradesText.setText('Upgrades: none');
-            }
-        }
     }
     
     handleAutoAttack() {
@@ -1212,9 +1175,9 @@ class GameScene extends Phaser.Scene {
         this.lastSpawnTime = 0;
         this.isIntermission = false;
         
-        // Give starting XP on wave 1 so players can test upgrades
+        // Give small starting XP on wave 1
         if (this.wave === 1) {
-            this.xpCurrency = 15; // Enough for 1 common upgrade
+            this.xpCurrency = 5; // Small head start, need to earn the rest
         }
         
         // Boss wave every 5 waves
@@ -1346,6 +1309,39 @@ class GameScene extends Phaser.Scene {
         this.time.delayedCall(500, () => {
             this.gameOverScreen.show(stats);
         });
+    }
+    
+    /**
+     * Clean up when scene is shutdown (restart/quit)
+     */
+    shutdown() {
+        console.log('GameScene shutdown - cleaning up');
+        
+        // Destroy HUD
+        if (this.hud) {
+            this.hud.destroy();
+            this.hud = null;
+        }
+        
+        // Hide/destroy UI overlays
+        if (this.upgradeUI) {
+            this.upgradeUI.hide();
+            this.upgradeUI = null;
+        }
+        if (this.pauseMenu) {
+            this.pauseMenu.hide();
+            this.pauseMenu = null;
+        }
+        if (this.gameOverScreen) {
+            this.gameOverScreen.hide();
+            this.gameOverScreen = null;
+        }
+        
+        // Clear object arrays
+        this.enemyObjects = [];
+        this.playerProjectileObjects = [];
+        this.enemyProjectileObjects = [];
+        this.pickupObjects = [];
     }
 }
 

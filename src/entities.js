@@ -607,7 +607,7 @@ class Enemy {
         this.maxHp = 30;
         this.speed = 80;
         this.damage = 10;
-        this.xpValue = 10;
+        this.xpValue = 3; // Reduced from 10
         this.essenceValue = 1;
         
         // State
@@ -864,7 +864,7 @@ class ChaserEnemy extends Enemy {
         this.maxHp = this.hp;
         this.speed = 120;
         this.damage = Math.round(8 * waveMultiplier);
-        this.xpValue = 8;
+        this.xpValue = 2; // Reduced from 8
         
         this.createVisuals();
         this.body.setCircle(12, -12, -12);
@@ -928,7 +928,7 @@ class ShooterEnemy extends Enemy {
         this.maxHp = this.hp;
         this.speed = 50;
         this.damage = Math.round(12 * waveMultiplier);
-        this.xpValue = 12;
+        this.xpValue = 4; // Reduced from 12
         this.shootCooldown = 2000;
         this.lastShootTime = 0;
         this.preferredDistance = 150;
@@ -1044,7 +1044,7 @@ class TankEnemy extends Enemy {
         this.maxHp = this.hp;
         this.speed = 40;
         this.damage = Math.round(20 * waveMultiplier);
-        this.xpValue = 25;
+        this.xpValue = 8; // Reduced from 25
         this.essenceValue = 3;
         
         this.createVisuals();
@@ -1117,13 +1117,13 @@ class SplitterEnemy extends Enemy {
             this.maxHp = this.hp;
             this.speed = 100;
             this.damage = Math.round(5 * waveMultiplier);
-            this.xpValue = 4;
+            this.xpValue = 1; // Reduced from 4
         } else {
             this.hp = Math.round(45 * waveMultiplier);
             this.maxHp = this.hp;
             this.speed = 70;
             this.damage = Math.round(10 * waveMultiplier);
-            this.xpValue = 15;
+            this.xpValue = 5; // Reduced from 15
         }
         
         this.createVisuals();
@@ -1187,7 +1187,7 @@ class BomberEnemy extends Enemy {
         this.maxHp = this.hp;
         this.speed = 130;
         this.damage = Math.round(25 * waveMultiplier);
-        this.xpValue = 10;
+        this.xpValue = 3; // Reduced from 10
         this.explodeRadius = 70;
         this.isExploding = false;
         
@@ -1355,7 +1355,7 @@ class BruteBoSS extends Enemy {
         this.maxHp = this.hp;
         this.speed = 60;
         this.damage = Math.round(30 * waveMultiplier);
-        this.xpValue = 200;
+        this.xpValue = 50; // Reduced from 200
         this.essenceValue = 20;
         
         // Boss abilities
