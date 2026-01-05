@@ -388,6 +388,15 @@ class Player {
         
         // Calculate damage
         let damage = this.baseDamage * (stats.damageMultiplier || 1);
+        
+        // Berserker rage perk: +50% damage when below 30% HP
+        if (this.scene.selectedCharacter && this.scene.selectedCharacter.perk === 'rage') {
+            var maxHp = stats.maxHp || this.maxHp || 100;
+            if (this.hp < maxHp * 0.3) {
+                damage *= 1.5;
+            }
+        }
+        
         const isCrit = Math.random() < (stats.critChance || 0.05);
         if (isCrit) {
             damage *= (stats.critDamageMultiplier || 1.5);

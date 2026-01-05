@@ -126,8 +126,18 @@ class GameHUD {
         }).setOrigin(0, 0.5);
         this.container.add(this.essenceText);
         
-        // Upgrade icons container (below HP bar, left side)
-        this.upgradeIconsContainer = this.scene.add.container(padding, padding + 48);
+        // Character display (below XP bar)
+        var character = this.scene.selectedCharacter || { icon: '🎮', name: 'Recruit' };
+        this.charText = this.scene.add.text(padding, padding + 44, character.icon + ' ' + character.name, {
+            fontFamily: 'Inter, sans-serif',
+            fontSize: '11px',
+            fontWeight: '600',
+            color: '#aaaaaa'
+        }).setOrigin(0, 0);
+        this.container.add(this.charText);
+        
+        // Upgrade icons container (below character display, left side)
+        this.upgradeIconsContainer = this.scene.add.container(padding, padding + 60);
         this.container.add(this.upgradeIconsContainer);
         
         // Dash cooldown indicator (bottom center)
@@ -1102,17 +1112,19 @@ class PauseMenu {
         }, 0xff4444);
     }
     
-    createMenuButton(x, y, text, callback, color = 0x00ffff) {
-        const container = this.scene.add.container(x, y);
+    createMenuButton(x, y, text, callback, color) {
+        if (color === undefined) color = 0x00ffff;
         
-        const bg = this.scene.add.graphics();
+        var container = this.scene.add.container(x, y);
+        
+        var bg = this.scene.add.graphics();
         bg.fillStyle(0x222233);
         bg.fillRoundedRect(-100, -25, 200, 50, 10);
         bg.lineStyle(2, color);
         bg.strokeRoundedRect(-100, -25, 200, 50, 10);
         container.add(bg);
         
-        const label = this.scene.add.text(0, 0, text, {
+        var label = this.scene.add.text(0, 0, text, {
             fontFamily: 'Rubik, sans-serif',
             fontSize: '18px',
             fontWeight: '700',
@@ -1120,19 +1132,32 @@ class PauseMenu {
         }).setOrigin(0.5);
         container.add(label);
         
+        // Use explicit hit area for mobile touch reliability
+        var hitArea = new Phaser.Geom.Rectangle(-100, -25, 200, 50);
         container.setSize(200, 50);
-        container.setInteractive({ useHandCursor: true })
-            .on('pointerdown', callback);
+        container.setInteractive(hitArea, Phaser.Geom.Rectangle.Contains);
+        
+        var self = this;
+        container.on('pointerdown', function() {
+            console.log('Pause menu button tapped:', text);
+            container.setScale(0.95);
+            self.scene.time.delayedCall(100, function() {
+                if (container && container.active) {
+                    container.setScale(1);
+                }
+                if (callback) callback();
+            });
+        });
         
         this.container.add(container);
         return container;
     }
     
     createToggle(x, y, labelText, initialValue, onChange) {
-        const container = this.scene.add.container(x, y);
+        var container = this.scene.add.container(x, y);
         
         // Label
-        const label = this.scene.add.text(-80, 0, labelText, {
+        var label = this.scene.add.text(-80, 0, labelText, {
             fontFamily: 'Inter, sans-serif',
             fontSize: '14px',
             color: '#ffffff'
@@ -1140,16 +1165,16 @@ class PauseMenu {
         container.add(label);
         
         // Toggle background
-        const toggleBg = this.scene.add.graphics();
+        var toggleBg = this.scene.add.graphics();
         container.add(toggleBg);
         
         // Toggle knob
-        const knob = this.scene.add.graphics();
+        var knob = this.scene.add.graphics();
         container.add(knob);
         
-        let isOn = initialValue;
+        var isOn = initialValue;
         
-        const updateVisual = () => {
+        var updateVisual = function() {
             toggleBg.clear();
             toggleBg.fillStyle(isOn ? 0x00ffff : 0x444444);
             toggleBg.fillRoundedRect(50, -12, 50, 24, 12);
@@ -1161,13 +1186,16 @@ class PauseMenu {
         
         updateVisual();
         
-        container.setSize(160, 30);
-        container.setInteractive({ useHandCursor: true })
-            .on('pointerdown', () => {
-                isOn = !isOn;
-                updateVisual();
-                onChange(isOn);
-            });
+        // Use explicit hit area for mobile touch reliability
+        var hitArea = new Phaser.Geom.Rectangle(-80, -15, 180, 30);
+        container.setSize(180, 30);
+        container.setInteractive(hitArea, Phaser.Geom.Rectangle.Contains);
+        
+        container.on('pointerdown', function() {
+            isOn = !isOn;
+            updateVisual();
+            onChange(isOn);
+        });
         
         this.container.add(container);
         return container;
@@ -1189,24 +1217,31 @@ class GameOverScreen {
     constructor(scene) {
         this.scene = scene;
         this.container = null;
+        this.buttons = []; // Track buttons for cleanup
     }
     
     show(stats) {
-        const width = this.scene.cameras.main.width;
-        const height = this.scene.cameras.main.height;
+        console.log('=== GAME OVER SCREEN SHOW ===');
+        
+        var width = this.scene.cameras.main.width;
+        var height = this.scene.cameras.main.height;
+        
+        // Clean up any existing container
+        this.hide();
         
         this.container = this.scene.add.container(0, 0);
         this.container.setDepth(4000);
         this.container.setScrollFactor(0);
+        this.buttons = [];
         
-        // Background
-        const overlay = this.scene.add.graphics();
+        // Background - NOT interactive to allow button taps through
+        var overlay = this.scene.add.graphics();
         overlay.fillStyle(0x0a0a1a, 0.95);
         overlay.fillRect(0, 0, width, height);
         this.container.add(overlay);
         
         // Title
-        const title = this.scene.add.text(width / 2, 80, 'GAME OVER', {
+        var title = this.scene.add.text(width / 2, 80, 'GAME OVER', {
             fontFamily: 'Rubik, sans-serif',
             fontSize: '42px',
             fontWeight: '800',
@@ -1215,8 +1250,8 @@ class GameOverScreen {
         this.container.add(title);
         
         // Stats section
-        const statsStartY = 160;
-        const statsSpacing = 45;
+        var statsStartY = 160;
+        var statsSpacing = 45;
         
         this.createStatRow(width / 2, statsStartY, 'Waves Survived', stats.wave.toString());
         this.createStatRow(width / 2, statsStartY + statsSpacing, 'Enemies Defeated', stats.kills.toString());
@@ -1226,7 +1261,7 @@ class GameOverScreen {
         
         // Upgrades list
         if (stats.upgrades && stats.upgrades.length > 0) {
-            const upgradesLabel = this.scene.add.text(width / 2, statsStartY + statsSpacing * 5.5, 'UPGRADES ACQUIRED:', {
+            var upgradesLabel = this.scene.add.text(width / 2, statsStartY + statsSpacing * 5.5, 'UPGRADES ACQUIRED:', {
                 fontFamily: 'Inter, sans-serif',
                 fontSize: '12px',
                 fontWeight: '600',
@@ -1234,26 +1269,54 @@ class GameOverScreen {
             }).setOrigin(0.5);
             this.container.add(upgradesLabel);
             
-            const upgradeIcons = stats.upgrades.map(u => u.icon).slice(0, 10).join(' ');
-            const upgradesText = this.scene.add.text(width / 2, statsStartY + statsSpacing * 6.2, upgradeIcons, {
+            var upgradeIcons = stats.upgrades.map(function(u) { return u.icon; }).slice(0, 10).join(' ');
+            var upgradesText = this.scene.add.text(width / 2, statsStartY + statsSpacing * 6.2, upgradeIcons, {
                 fontSize: '20px'
             }).setOrigin(0.5);
             this.container.add(upgradesText);
         }
         
-        // Retry button
-        const retryBtn = this.createButton(width / 2, height - 100, 'RETRY', () => {
-            this.hide();
-            this.scene.scene.start('GameScene');
-        });
-        this.container.add(retryBtn);
+        // Award yellow gems based on performance
+        var gemsEarned = Math.floor(stats.wave * 2 + stats.kills * 0.1);
+        var currentGems = parseInt(localStorage.getItem('gemsYellow') || '0');
+        localStorage.setItem('gemsYellow', (currentGems + gemsEarned).toString());
         
-        // Menu button
-        const menuBtn = this.createButton(width / 2, height - 45, 'MAIN MENU', () => {
-            this.hide();
-            this.scene.scene.start('MenuScene');
+        // Show gems earned
+        var gemsText = this.scene.add.text(width / 2, height - 160, '💎 +' + gemsEarned + ' Gems', {
+            fontFamily: 'Rubik, sans-serif',
+            fontSize: '18px',
+            fontWeight: '700',
+            color: '#ffdd00'
+        }).setOrigin(0.5);
+        this.container.add(gemsText);
+        
+        // Track challenge progress
+        this.trackChallengeProgress(stats);
+        
+        var self = this;
+        
+        // Get current character ID for retry
+        var currentCharId = this.scene.selectedCharacterId || 
+            localStorage.getItem('selectedCharacterId') || 'starter';
+        
+        // Retry button - add directly to scene for better touch handling
+        var retryBtn = this.createButton(width / 2, height - 100, 'RETRY', function() {
+            console.log('=== RETRY BUTTON TAPPED ===');
+            console.log('Restarting with character:', currentCharId);
+            self.hide();
+            console.log('Starting GameScene...');
+            self.scene.scene.start('GameScene', { selectedCharacterId: currentCharId });
+        }, false);
+        this.buttons.push(retryBtn);
+        
+        // Menu button - add directly to scene for better touch handling
+        var menuBtn = this.createButton(width / 2, height - 45, 'MAIN MENU', function() {
+            console.log('=== MAIN MENU BUTTON TAPPED ===');
+            self.hide();
+            console.log('Starting MenuScene...');
+            self.scene.scene.start('MenuScene');
         }, true);
-        this.container.add(menuBtn);
+        this.buttons.push(menuBtn);
         
         // Entrance animation
         this.container.alpha = 0;
@@ -1262,17 +1325,77 @@ class GameOverScreen {
             alpha: 1,
             duration: 500
         });
+        
+        console.log('Game Over screen initialized with', this.buttons.length, 'buttons');
+    }
+    
+    trackChallengeProgress(stats) {
+        // Track challenges completed this run
+        var completed = JSON.parse(localStorage.getItem('completedChallengeIds') || '[]');
+        
+        // Challenge: Survive 5 waves
+        if (stats.wave >= 5 && completed.indexOf('survive_5_waves') === -1) {
+            completed.push('survive_5_waves');
+            console.log('Challenge completed: survive_5_waves');
+        }
+        // Challenge: Survive 10 waves
+        if (stats.wave >= 10 && completed.indexOf('survive_10_waves') === -1) {
+            completed.push('survive_10_waves');
+            console.log('Challenge completed: survive_10_waves');
+        }
+        // Challenge: Kill 50 enemies
+        if (stats.kills >= 50 && completed.indexOf('kill_50') === -1) {
+            completed.push('kill_50');
+            console.log('Challenge completed: kill_50');
+        }
+        // Challenge: Kill 100 enemies
+        if (stats.kills >= 100 && completed.indexOf('kill_100') === -1) {
+            completed.push('kill_100');
+            console.log('Challenge completed: kill_100');
+        }
+        // Challenge: Reach level 5
+        if (stats.level >= 5 && completed.indexOf('level_5') === -1) {
+            completed.push('level_5');
+            console.log('Challenge completed: level_5');
+        }
+        // Challenge: Reach level 10
+        if (stats.level >= 10 && completed.indexOf('level_10') === -1) {
+            completed.push('level_10');
+            console.log('Challenge completed: level_10');
+        }
+        // Challenge: Get 5 upgrades
+        if (stats.upgradesCount >= 5 && completed.indexOf('upgrades_5') === -1) {
+            completed.push('upgrades_5');
+            console.log('Challenge completed: upgrades_5');
+        }
+        // Challenge: Get 10 upgrades
+        if (stats.upgradesCount >= 10 && completed.indexOf('upgrades_10') === -1) {
+            completed.push('upgrades_10');
+            console.log('Challenge completed: upgrades_10');
+        }
+        // Challenge: Survive 15 waves
+        if (stats.wave >= 15 && completed.indexOf('survive_15_waves') === -1) {
+            completed.push('survive_15_waves');
+            console.log('Challenge completed: survive_15_waves');
+        }
+        // Challenge: Kill 200 enemies
+        if (stats.kills >= 200 && completed.indexOf('kill_200') === -1) {
+            completed.push('kill_200');
+            console.log('Challenge completed: kill_200');
+        }
+        
+        localStorage.setItem('completedChallengeIds', JSON.stringify(completed));
     }
     
     createStatRow(x, y, label, value) {
-        const labelText = this.scene.add.text(x - 80, y, label, {
+        var labelText = this.scene.add.text(x - 80, y, label, {
             fontFamily: 'Inter, sans-serif',
             fontSize: '16px',
             color: '#888888'
         }).setOrigin(0, 0.5);
         this.container.add(labelText);
         
-        const valueText = this.scene.add.text(x + 80, y, value, {
+        var valueText = this.scene.add.text(x + 80, y, value, {
             fontFamily: 'Rubik, sans-serif',
             fontSize: '20px',
             fontWeight: '700',
@@ -1281,10 +1404,13 @@ class GameOverScreen {
         this.container.add(valueText);
     }
     
-    createButton(x, y, text, callback, secondary = false) {
-        const container = this.scene.add.container(x, y);
+    createButton(x, y, text, callback, secondary) {
+        // Create button directly on scene (not in container) for better mobile touch
+        var container = this.scene.add.container(x, y);
+        container.setScrollFactor(0);
+        container.setDepth(4001); // Above game over overlay
         
-        const bg = this.scene.add.graphics();
+        var bg = this.scene.add.graphics();
         if (secondary) {
             bg.fillStyle(0x333344);
             bg.fillRoundedRect(-100, -22, 200, 44, 10);
@@ -1296,7 +1422,7 @@ class GameOverScreen {
         }
         container.add(bg);
         
-        const label = this.scene.add.text(0, 0, text, {
+        var label = this.scene.add.text(0, 0, text, {
             fontFamily: 'Rubik, sans-serif',
             fontSize: '18px',
             fontWeight: '700',
@@ -1304,30 +1430,60 @@ class GameOverScreen {
         }).setOrigin(0.5);
         container.add(label);
         
+        // Use explicit hit area for mobile touch reliability
+        var hitArea = new Phaser.Geom.Rectangle(-100, -22, 200, 44);
         container.setSize(200, 44);
-        container.setInteractive({ useHandCursor: true })
-            .on('pointerover', () => {
-                this.scene.tweens.add({
-                    targets: container,
-                    scaleX: 1.05,
-                    scaleY: 1.05,
-                    duration: 100
-                });
-            })
-            .on('pointerout', () => {
-                this.scene.tweens.add({
-                    targets: container,
-                    scaleX: 1,
-                    scaleY: 1,
-                    duration: 100
-                });
-            })
-            .on('pointerdown', callback);
+        container.setInteractive(hitArea, Phaser.Geom.Rectangle.Contains);
+        
+        var self = this;
+        
+        container.on('pointerover', function() {
+            self.scene.tweens.add({
+                targets: container,
+                scaleX: 1.05,
+                scaleY: 1.05,
+                duration: 100
+            });
+        });
+        
+        container.on('pointerout', function() {
+            self.scene.tweens.add({
+                targets: container,
+                scaleX: 1,
+                scaleY: 1,
+                duration: 100
+            });
+        });
+        
+        container.on('pointerdown', function() {
+            console.log('Button pointerdown:', text);
+            container.setScale(0.95);
+            self.scene.time.delayedCall(100, function() {
+                if (container && container.active) {
+                    container.setScale(1);
+                }
+                if (callback) {
+                    callback();
+                }
+            });
+        });
         
         return container;
     }
     
     hide() {
+        console.log('GameOverScreen.hide()');
+        
+        // Destroy buttons (they're not in the container)
+        if (this.buttons) {
+            this.buttons.forEach(function(btn) {
+                if (btn && btn.destroy) {
+                    btn.destroy();
+                }
+            });
+            this.buttons = [];
+        }
+        
         if (this.container) {
             this.container.destroy();
             this.container = null;
