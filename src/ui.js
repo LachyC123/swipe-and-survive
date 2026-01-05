@@ -6,6 +6,8 @@
  * Handles HUD, menus, upgrade cards, and overlays.
  */
 
+console.log('ui.js loading...');
+
 // ===================================
 // HUD CLASS
 // ===================================

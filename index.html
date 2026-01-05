@@ -37,39 +37,32 @@
             <div class="loading-bar">
                 <div class="loading-progress" id="loading-progress"></div>
             </div>
-            <p class="loading-text">Loading...</p>
+            <p class="loading-text" id="loading-text">Loading...</p>
         </div>
     </div>
     
     <!-- Game Container -->
     <div id="game-container"></div>
     
-    <!-- Phaser 3 via CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
-    
-    <!-- Game Scripts (order matters) -->
-    <script src="src/upgrades.js"></script>
-    <script src="src/entities.js"></script>
-    <script src="src/ui.js"></script>
-    <script src="src/game.js"></script>
-    <script src="src/main.js"></script>
-    
-    <!-- Error Handler -->
+    <!-- Error Handler FIRST - before any other scripts -->
     <script>
-        // Global error handling for mobile debugging
         (function() {
-            const errorOverlay = document.getElementById('error-overlay');
-            const errorMessage = document.getElementById('error-message');
-            const copyBtn = document.getElementById('copy-error-btn');
-            const dismissBtn = document.getElementById('dismiss-error-btn');
-            
-            let errorLog = [];
+            var errorLog = [];
             
             function showError(msg, source, line, col, error) {
-                const errorText = `${msg}\n\nSource: ${source || 'unknown'}\nLine: ${line || '?'}, Col: ${col || '?'}\n\n${error ? error.stack : ''}`;
+                var errorText = msg + '\n\nSource: ' + (source || 'unknown') + '\nLine: ' + (line || '?') + ', Col: ' + (col || '?');
+                if (error && error.stack) {
+                    errorText += '\n\nStack:\n' + error.stack;
+                }
                 errorLog.push(errorText);
-                errorMessage.textContent = errorText;
-                errorOverlay.classList.remove('hidden');
+                
+                var overlay = document.getElementById('error-overlay');
+                var msgEl = document.getElementById('error-message');
+                if (overlay && msgEl) {
+                    msgEl.textContent = errorText;
+                    overlay.classList.remove('hidden');
+                }
+                console.error('Game Error:', errorText);
             }
             
             window.onerror = function(msg, source, line, col, error) {
@@ -81,17 +74,114 @@
                 showError('Unhandled Promise Rejection: ' + event.reason, '', '', '', event.reason);
             });
             
-            copyBtn.addEventListener('click', function() {
-                navigator.clipboard.writeText(errorLog.join('\n\n---\n\n')).then(() => {
-                    copyBtn.textContent = 'Copied!';
-                    setTimeout(() => copyBtn.textContent = 'Copy Error', 2000);
-                });
+            // Setup button handlers after DOM ready
+            document.addEventListener('DOMContentLoaded', function() {
+                var copyBtn = document.getElementById('copy-error-btn');
+                var dismissBtn = document.getElementById('dismiss-error-btn');
+                
+                if (copyBtn) {
+                    copyBtn.addEventListener('click', function() {
+                        var text = errorLog.join('\n\n---\n\n');
+                        if (navigator.clipboard) {
+                            navigator.clipboard.writeText(text).then(function() {
+                                copyBtn.textContent = 'Copied!';
+                                setTimeout(function() { copyBtn.textContent = 'Copy Error'; }, 2000);
+                            });
+                        }
+                    });
+                }
+                
+                if (dismissBtn) {
+                    dismissBtn.addEventListener('click', function() {
+                        document.getElementById('error-overlay').classList.add('hidden');
+                    });
+                }
             });
             
-            dismissBtn.addEventListener('click', function() {
-                errorOverlay.classList.add('hidden');
-            });
+            // Expose for manual error reporting
+            window.reportError = showError;
         })();
+    </script>
+    
+    <!-- Phaser 3 via CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
+    
+    <!-- Check Phaser loaded -->
+    <script>
+        if (typeof Phaser === 'undefined') {
+            window.reportError('Phaser failed to load from CDN', 'index.html', 0, 0, null);
+        } else {
+            var loadText = document.getElementById('loading-text');
+            if (loadText) loadText.textContent = 'Loading game...';
+            var progress = document.getElementById('loading-progress');
+            if (progress) progress.style.width = '20%';
+        }
+    </script>
+    
+    <!-- Game Scripts (order matters - dependencies first) -->
+    <script src="./src/upgrades.js"></script>
+    <script>
+        if (typeof UpgradeManager === 'undefined') {
+            window.reportError('upgrades.js failed to load or define UpgradeManager', 'index.html', 0, 0, null);
+        } else {
+            var progress = document.getElementById('loading-progress');
+            if (progress) progress.style.width = '35%';
+        }
+    </script>
+    
+    <script src="./src/entities.js"></script>
+    <script>
+        if (typeof Player === 'undefined') {
+            window.reportError('entities.js failed to load or define Player', 'index.html', 0, 0, null);
+        } else {
+            var progress = document.getElementById('loading-progress');
+            if (progress) progress.style.width = '50%';
+        }
+    </script>
+    
+    <script src="./src/ui.js"></script>
+    <script>
+        if (typeof GameHUD === 'undefined') {
+            window.reportError('ui.js failed to load or define GameHUD', 'index.html', 0, 0, null);
+        } else {
+            var progress = document.getElementById('loading-progress');
+            if (progress) progress.style.width = '65%';
+        }
+    </script>
+    
+    <script src="./src/game.js"></script>
+    <script>
+        if (typeof MenuScene === 'undefined' || typeof GameScene === 'undefined') {
+            window.reportError('game.js failed to load or define scenes', 'index.html', 0, 0, null);
+        } else {
+            var progress = document.getElementById('loading-progress');
+            if (progress) progress.style.width = '80%';
+        }
+    </script>
+    
+    <script src="./src/main.js"></script>
+    <script>
+        var progress = document.getElementById('loading-progress');
+        if (progress) progress.style.width = '100%';
+        
+        // Final check - if game didn't start after 3 seconds, show error
+        setTimeout(function() {
+            var loadingScreen = document.getElementById('loading-screen');
+            var gameContainer = document.getElementById('game-container');
+            
+            // Check if game canvas was created
+            if (loadingScreen && !loadingScreen.classList.contains('hidden')) {
+                var canvas = gameContainer ? gameContainer.querySelector('canvas') : null;
+                if (!canvas) {
+                    window.reportError(
+                        'Game failed to initialize - no canvas created.\n\nPhaser: ' + (typeof Phaser !== 'undefined' ? 'loaded' : 'NOT loaded') +
+                        '\nMenuScene: ' + (typeof MenuScene !== 'undefined' ? 'defined' : 'NOT defined') +
+                        '\nGameScene: ' + (typeof GameScene !== 'undefined' ? 'defined' : 'NOT defined'),
+                        'index.html', 0, 0, null
+                    );
+                }
+            }
+        }, 3000);
     </script>
 </body>
 </html>

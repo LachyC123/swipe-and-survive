@@ -7,6 +7,8 @@
  * Upgrades can stack and have multiple levels.
  */
 
+console.log('upgrades.js loading...');
+
 // Rarity configuration
 const RARITY = {
     COMMON: {

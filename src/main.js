@@ -6,11 +6,13 @@
  * Phaser 3 configuration, boot sequence, and resize handling.
  */
 
+console.log('main.js loading...');
+
 // ===================================
 // GAME CONFIGURATION
 // ===================================
 
-const gameConfig = {
+var gameConfig = {
     type: Phaser.AUTO,
     parent: 'game-container',
     
@@ -43,8 +45,7 @@ const gameConfig = {
         default: 'arcade',
         arcade: {
             gravity: { y: 0 },
-            debug: false,
-            fps: 60
+            debug: false
         }
     },
     
@@ -56,8 +57,8 @@ const gameConfig = {
         }
     },
     
-    // Scenes
-    scene: [MenuScene, GameScene],
+    // Scenes - use window references to ensure they're defined
+    scene: [window.MenuScene, window.GameScene],
     
     // Performance settings
     fps: {
@@ -72,201 +73,144 @@ const gameConfig = {
     // Disable context menu on right-click
     disableContextMenu: true,
     
-    // Transparent canvas (optional)
+    // Transparent canvas
     transparent: false,
     
     // Banner disabled
-    banner: false
-};
-
-// ===================================
-// BOOT SEQUENCE
-// ===================================
-
-class GameBoot {
-    constructor() {
-        this.game = null;
-        this.loadingProgress = 0;
-    }
+    banner: false,
     
-    init() {
-        // Update loading progress
-        this.updateLoadingProgress(10);
-        
-        // Initialize audio manager
-        window.gameAudioManager = new AudioManager();
-        this.updateLoadingProgress(30);
-        
-        // Detect device capabilities
-        this.detectDevice();
-        this.updateLoadingProgress(50);
-        
-        // Apply saved settings
-        this.applySettings();
-        this.updateLoadingProgress(70);
-        
-        // Create game instance
-        this.createGame();
-        this.updateLoadingProgress(100);
-    }
-    
-    updateLoadingProgress(percent) {
-        this.loadingProgress = percent;
-        const progressBar = document.getElementById('loading-progress');
-        if (progressBar) {
-            progressBar.style.width = `${percent}%`;
-        }
-    }
-    
-    detectDevice() {
-        // Detect if running on mobile
-        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-        const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
-        const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-        
-        window.gameDeviceInfo = {
-            isMobile,
-            isIOS,
-            isSafari,
-            isIOSSafari: isIOS && isSafari,
-            pixelRatio: window.devicePixelRatio || 1,
-            screenWidth: window.screen.width,
-            screenHeight: window.screen.height
-        };
-        
-        console.log('Device Info:', window.gameDeviceInfo);
-        
-        // Auto-enable reduced effects on older/slower devices
-        if (isMobile && window.devicePixelRatio < 2) {
-            if (localStorage.getItem('reducedEffects') === null) {
-                localStorage.setItem('reducedEffects', 'true');
+    // Callbacks for debugging
+    callbacks: {
+        preBoot: function(game) {
+            console.log('Phaser preBoot');
+        },
+        postBoot: function(game) {
+            console.log('Phaser postBoot - game ready');
+            // Hide loading screen
+            var loadingScreen = document.getElementById('loading-screen');
+            if (loadingScreen) {
+                loadingScreen.classList.add('hidden');
             }
         }
     }
+};
+
+// ===================================
+// INITIALIZATION FUNCTION
+// ===================================
+
+function initGame() {
+    console.log('initGame called');
     
-    applySettings() {
-        // Apply default settings if not set
+    // Verify dependencies
+    if (typeof Phaser === 'undefined') {
+        window.reportError('Phaser is not defined', 'main.js', 0, 0, null);
+        return;
+    }
+    
+    if (typeof window.MenuScene === 'undefined') {
+        window.reportError('MenuScene is not defined', 'main.js', 0, 0, null);
+        return;
+    }
+    
+    if (typeof window.GameScene === 'undefined') {
+        window.reportError('GameScene is not defined', 'main.js', 0, 0, null);
+        return;
+    }
+    
+    try {
+        // Initialize audio manager
+        window.gameAudioManager = new AudioManager();
+        console.log('AudioManager created');
+        
+        // Detect device
+        var isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        var isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+        var isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+        
+        window.gameDeviceInfo = {
+            isMobile: isMobile,
+            isIOS: isIOS,
+            isSafari: isSafari,
+            isIOSSafari: isIOS && isSafari,
+            pixelRatio: window.devicePixelRatio || 1
+        };
+        console.log('Device info:', window.gameDeviceInfo);
+        
+        // Apply default settings
         if (localStorage.getItem('soundEnabled') === null) {
             localStorage.setItem('soundEnabled', 'true');
         }
         if (localStorage.getItem('reducedEffects') === null) {
-            localStorage.setItem('reducedEffects', 'false');
+            localStorage.setItem('reducedEffects', isMobile ? 'false' : 'false');
         }
-    }
-    
-    createGame() {
-        try {
-            this.game = new Phaser.Game(gameConfig);
-            
-            // Handle resize events
-            window.addEventListener('resize', () => this.handleResize());
-            window.addEventListener('orientationchange', () => {
-                setTimeout(() => this.handleResize(), 100);
-            });
-            
-            // Handle visibility change (pause when tab hidden)
-            document.addEventListener('visibilitychange', () => {
-                if (document.hidden) {
-                    if (this.game && this.game.scene.scenes.length > 0) {
-                        const gameScene = this.game.scene.getScene('GameScene');
-                        if (gameScene && gameScene.scene.isActive()) {
-                            gameScene.showPauseMenu();
-                        }
-                    }
-                }
-            });
-            
-            // Prevent default touch behaviors
-            document.addEventListener('touchmove', (e) => {
-                if (e.target.closest('#game-container')) {
-                    e.preventDefault();
-                }
-            }, { passive: false });
-            
-            // iOS Safari address bar fix
-            if (window.gameDeviceInfo.isIOSSafari) {
-                this.handleIOSSafari();
+        
+        // Create the Phaser game
+        console.log('Creating Phaser.Game...');
+        window.game = new Phaser.Game(gameConfig);
+        console.log('Phaser.Game created successfully');
+        
+        // Handle resize
+        window.addEventListener('resize', function() {
+            if (window.game) {
+                window.game.scale.refresh();
             }
-            
-            console.log('Game initialized successfully');
-            
-        } catch (error) {
-            console.error('Failed to create game:', error);
-            this.showError(error);
-        }
-    }
-    
-    handleResize() {
-        if (!this.game) return;
+        });
         
-        // Force scale manager to update
-        this.game.scale.refresh();
-    }
-    
-    handleIOSSafari() {
-        // Fix for iOS Safari viewport issues
-        const setViewportHeight = () => {
-            document.documentElement.style.setProperty(
-                '--vh',
-                `${window.innerHeight * 0.01}px`
-            );
-        };
+        // Handle orientation change
+        window.addEventListener('orientationchange', function() {
+            setTimeout(function() {
+                if (window.game) {
+                    window.game.scale.refresh();
+                }
+            }, 100);
+        });
         
-        setViewportHeight();
-        window.addEventListener('resize', setViewportHeight);
-        
-        // Prevent bounce scroll
-        document.body.addEventListener('touchmove', (e) => {
-            if (!e.target.closest('#game-container canvas')) {
+        // Prevent default touch behaviors on game container
+        document.addEventListener('touchmove', function(e) {
+            if (e.target.closest && e.target.closest('#game-container')) {
                 e.preventDefault();
             }
         }, { passive: false });
-    }
-    
-    showError(error) {
-        const errorOverlay = document.getElementById('error-overlay');
-        const errorMessage = document.getElementById('error-message');
         
-        if (errorOverlay && errorMessage) {
-            errorMessage.textContent = `Initialization Error:\n${error.message}\n\n${error.stack}`;
-            errorOverlay.classList.remove('hidden');
+        // iOS Safari fixes
+        if (window.gameDeviceInfo.isIOSSafari) {
+            var setVh = function() {
+                document.documentElement.style.setProperty('--vh', (window.innerHeight * 0.01) + 'px');
+            };
+            setVh();
+            window.addEventListener('resize', setVh);
+        }
+        
+    } catch (error) {
+        console.error('Failed to initialize game:', error);
+        if (window.reportError) {
+            window.reportError('Game initialization failed: ' + error.message, 'main.js', 0, 0, error);
         }
     }
 }
 
 // ===================================
-// INITIALIZATION
+// START THE GAME
 // ===================================
 
-// Wait for DOM and Phaser to be ready
-document.addEventListener('DOMContentLoaded', () => {
-    // Small delay to ensure all scripts are loaded
-    setTimeout(() => {
-        try {
-            const boot = new GameBoot();
-            boot.init();
-        } catch (error) {
-            console.error('Boot failed:', error);
-            
-            // Show error on screen
-            const errorOverlay = document.getElementById('error-overlay');
-            const errorMessage = document.getElementById('error-message');
-            
-            if (errorOverlay && errorMessage) {
-                errorMessage.textContent = `Boot Error:\n${error.message}\n\n${error.stack}`;
-                errorOverlay.classList.remove('hidden');
-            }
-        }
-    }, 100);
-});
+// Check if DOM is already ready
+if (document.readyState === 'loading') {
+    // DOM not ready, wait for it
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('DOMContentLoaded fired');
+        initGame();
+    });
+} else {
+    // DOM is already ready, init immediately
+    console.log('DOM already ready, initializing...');
+    initGame();
+}
 
 // ===================================
 // UTILITY FUNCTIONS
 // ===================================
 
-/**
- * Format large numbers with K/M suffix
- */
 function formatNumber(num) {
     if (num >= 1000000) {
         return (num / 1000000).toFixed(1) + 'M';
@@ -277,41 +221,21 @@ function formatNumber(num) {
     return num.toString();
 }
 
-/**
- * Clamp value between min and max
- */
 function clamp(value, min, max) {
     return Math.min(Math.max(value, min), max);
 }
 
-/**
- * Linear interpolation
- */
 function lerp(a, b, t) {
     return a + (b - a) * t;
 }
 
-/**
- * Random float between min and max
- */
 function randomRange(min, max) {
     return min + Math.random() * (max - min);
 }
 
-/**
- * Check if point is inside circle
- */
-function pointInCircle(px, py, cx, cy, radius) {
-    const dx = px - cx;
-    const dy = py - cy;
-    return dx * dx + dy * dy <= radius * radius;
-}
-
-// Export utilities
 window.formatNumber = formatNumber;
 window.clamp = clamp;
 window.lerp = lerp;
 window.randomRange = randomRange;
-window.pointInCircle = pointInCircle;
 
-console.log('Swipe & Survive - Main module loaded');
+console.log('main.js loaded');
