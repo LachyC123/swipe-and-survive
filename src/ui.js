@@ -235,6 +235,7 @@ class UpgradeSelectionUI {
     
     show(choices, upgradeManager, callback) {
         this.selectedCallback = callback;
+        this.selectionMade = false; // Prevent double-selection
         
         const width = this.scene.cameras.main.width;
         const height = this.scene.cameras.main.height;
@@ -243,11 +244,20 @@ class UpgradeSelectionUI {
         this.container.setDepth(2000);
         this.container.setScrollFactor(0);
         
-        // Darkened background
+        // Darkened background - NOT interactive so it won't block clicks
         const overlay = this.scene.add.graphics();
         overlay.fillStyle(0x000000, 0.85);
         overlay.fillRect(0, 0, width, height);
         this.container.add(overlay);
+        
+        // Debug text for selection feedback
+        this.debugSelectText = this.scene.add.text(width / 2, height - 40, '', {
+            fontFamily: 'monospace',
+            fontSize: '12px',
+            color: '#00ff00',
+            backgroundColor: '#000000'
+        }).setOrigin(0.5).setDepth(2001);
+        this.container.add(this.debugSelectText);
         
         // Title
         const title = this.scene.add.text(width / 2, 60, 'CHOOSE AN UPGRADE', {
@@ -372,32 +382,59 @@ class UpgradeSelectionUI {
         }).setOrigin(0.5);
         container.add(levelText);
         
-        // Make interactive
+        // Make interactive with EXPLICIT hit area rectangle
+        // The hit area is centered on the container (0,0), so offset by -width/2, -height/2
+        var hitArea = new Phaser.Geom.Rectangle(-width / 2, -height / 2, width, height);
         container.setSize(width, height);
-        container.setInteractive({ useHandCursor: true })
-            .on('pointerover', () => {
-                if (!isMaxed) {
-                    this.scene.tweens.add({
-                        targets: container,
-                        scaleX: 1.05,
-                        scaleY: 1.05,
-                        duration: 100
-                    });
-                }
-            })
-            .on('pointerout', () => {
-                this.scene.tweens.add({
+        container.setInteractive(hitArea, Phaser.Geom.Rectangle.Contains);
+        
+        // Store reference for click handler
+        var self = this;
+        var upgradeData = upgrade;
+        var cardBg = bg;
+        
+        container.on('pointerover', function() {
+            if (!isMaxed && !self.selectionMade) {
+                self.scene.tweens.add({
+                    targets: container,
+                    scaleX: 1.05,
+                    scaleY: 1.05,
+                    duration: 100
+                });
+            }
+        });
+        
+        container.on('pointerout', function() {
+            if (!self.selectionMade) {
+                self.scene.tweens.add({
                     targets: container,
                     scaleX: 1,
                     scaleY: 1,
                     duration: 100
                 });
-            })
-            .on('pointerdown', () => {
-                if (!isMaxed) {
-                    this.selectUpgrade(upgrade);
+            }
+        });
+        
+        container.on('pointerdown', function() {
+            console.log('Upgrade card clicked:', upgradeData.id, upgradeData.name);
+            
+            // Update debug text
+            if (self.debugSelectText) {
+                self.debugSelectText.setText('Selected: ' + upgradeData.id);
+            }
+            
+            // Visual press feedback
+            container.setScale(0.95);
+            self.scene.time.delayedCall(100, function() {
+                if (container && container.active) {
+                    container.setScale(1);
                 }
             });
+            
+            if (!isMaxed && !self.selectionMade) {
+                self.selectUpgrade(upgradeData);
+            }
+        });
         
         // Entrance animation
         container.alpha = 0;
@@ -432,38 +469,72 @@ class UpgradeSelectionUI {
         }).setOrigin(0.5);
         container.add(text);
         
+        // Explicit hit area for container
+        var hitArea = new Phaser.Geom.Rectangle(-70, -20, 140, 40);
         container.setSize(140, 40);
-        container.setInteractive({ useHandCursor: true })
-            .on('pointerdown', callback);
+        container.setInteractive(hitArea, Phaser.Geom.Rectangle.Contains);
+        
+        container.on('pointerdown', function() {
+            console.log('Reroll button clicked');
+            container.setScale(0.95);
+            callback();
+        });
+        
+        container.on('pointerover', function() {
+            container.setScale(1.05);
+        });
+        
+        container.on('pointerout', function() {
+            container.setScale(1);
+        });
         
         return container;
     }
     
     selectUpgrade(upgrade) {
+        // Prevent double-selection
+        if (this.selectionMade) {
+            console.log('Selection already made, ignoring');
+            return;
+        }
+        this.selectionMade = true;
+        
+        console.log('selectUpgrade called:', upgrade.id, upgrade.name);
+        
         // Play level up sound
         if (this.scene.audioManager) {
             this.scene.audioManager.playLevelUp();
         }
+        
+        // Store callback before animation (in case container gets destroyed)
+        var callback = this.selectedCallback;
+        var selectedUpgrade = upgrade;
+        var self = this;
         
         // Selection animation
         this.scene.tweens.add({
             targets: this.container,
             alpha: 0,
             duration: 200,
-            onComplete: () => {
-                this.hide();
-                if (this.selectedCallback) {
-                    this.selectedCallback(upgrade);
+            onComplete: function() {
+                console.log('Upgrade selection animation complete, closing UI');
+                self.hide();
+                if (callback) {
+                    console.log('Calling upgrade callback with:', selectedUpgrade.id);
+                    callback(selectedUpgrade);
                 }
             }
         });
     }
     
     hide() {
+        console.log('UpgradeSelectionUI.hide() called');
         if (this.container) {
             this.container.destroy();
             this.container = null;
         }
+        this.selectionMade = false;
+        this.selectedCallback = null;
     }
 }
 
