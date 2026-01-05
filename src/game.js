@@ -318,6 +318,9 @@ class GameScene extends Phaser.Scene {
         this.isIntermission = false;
         this.gameOver = false;
         
+        // XP Currency - single source of truth for upgrade purchases
+        this.xpCurrency = 0;
+        
         // Spawn tracking
         this.lastSpawnTime = 0;
         this.spawnInterval = 2000;
@@ -377,12 +380,21 @@ class GameScene extends Phaser.Scene {
         this.setupCollisions();
         
         // Debug HP text (top-left, always visible)
-        this.debugHpText = this.add.text(10, 10, 'HP: 100/100', {
+        this.debugHpText = this.add.text(10, 10, 'HP: 100/100 | XP: 0 | Invuln: false', {
             fontFamily: 'monospace',
-            fontSize: '14px',
+            fontSize: '12px',
             color: '#00ff00',
-            backgroundColor: '#000000aa',
+            backgroundColor: '#000000cc',
             padding: { x: 5, y: 3 }
+        }).setScrollFactor(0).setDepth(9999);
+        
+        // Active upgrades display (below HP)
+        this.debugUpgradesText = this.add.text(10, 35, 'Upgrades: none', {
+            fontFamily: 'monospace',
+            fontSize: '10px',
+            color: '#88ffff',
+            backgroundColor: '#000000cc',
+            padding: { x: 5, y: 2 }
         }).setScrollFactor(0).setDepth(9999);
         
         // Player damage invulnerability tracking
@@ -572,6 +584,8 @@ class GameScene extends Phaser.Scene {
     }
     
     setupCollisions() {
+        var self = this;
+        
         // Player projectiles hit enemies
         this.physics.add.overlap(
             this.playerProjectiles,
@@ -581,11 +595,23 @@ class GameScene extends Phaser.Scene {
             this
         );
         
-        // Enemy projectiles hit player
+        // Enemy projectiles hit player - use callback to process manually
+        // This ensures the overlap is detected even if argument order varies
         this.physics.add.overlap(
             this.enemyProjectiles,
             this.player.container,
-            this.handleEnemyProjectileHit,
+            function(obj1, obj2) {
+                // Determine which is the projectile
+                var projGraphics = null;
+                if (self.enemyProjectileObjects.find(function(p) { return p.graphics === obj1; })) {
+                    projGraphics = obj1;
+                } else if (self.enemyProjectileObjects.find(function(p) { return p.graphics === obj2; })) {
+                    projGraphics = obj2;
+                }
+                if (projGraphics) {
+                    self.handleEnemyProjectileHit.call(self, projGraphics, self.player.container);
+                }
+            },
             null,
             this
         );
@@ -662,21 +688,34 @@ class GameScene extends Phaser.Scene {
     }
     
     handleEnemyProjectileHit(projectileGraphics, playerContainer) {
-        // Safeguard: validate objects
-        if (!projectileGraphics || !projectileGraphics.active) return;
-        if (!this.player) return;
+        console.log('handleEnemyProjectileHit called');
         
-        var projectile = this.enemyProjectileObjects.find(p => p.graphics === projectileGraphics);
-        if (!projectile) return;
+        // Safeguard: validate objects
+        if (!projectileGraphics || !projectileGraphics.active) {
+            console.log('  Invalid projectile graphics');
+            return;
+        }
+        if (!this.player) {
+            console.log('  No player');
+            return;
+        }
+        
+        var projectile = this.enemyProjectileObjects.find(function(p) { return p.graphics === projectileGraphics; });
+        if (!projectile) {
+            console.log('  Projectile not found in objects array');
+            return;
+        }
         
         // Apply damage using centralized function
         var damage = projectile.damage || 10;
+        console.log('  Applying damage:', damage, 'Player HP before:', this.player.hp);
+        
         var died = this.applyPlayerDamage(damage, null);
+        
+        console.log('  Player HP after:', this.player.hp, 'died:', died);
         
         // Always despawn the bullet on hit
         this.removeEnemyProjectile(projectile);
-        
-        console.log('Enemy projectile hit player, damage:', damage, 'died:', died);
         
         if (died && !this.gameOver) {
             this.handleGameOver();
@@ -822,7 +861,8 @@ class GameScene extends Phaser.Scene {
             this.xp,
             this.level,
             this.xpToNextLevel,
-            this.upgradeManager.stats
+            this.upgradeManager.stats,
+            this.xpCurrency
         );
         
         // Update debug HP text every frame
@@ -830,7 +870,8 @@ class GameScene extends Phaser.Scene {
             var stats = this.upgradeManager ? this.upgradeManager.stats : {};
             var maxHp = stats.maxHp || this.player.maxHp || 100;
             var currentHp = Math.ceil(this.player.hp);
-            this.debugHpText.setText('HP: ' + currentHp + '/' + maxHp);
+            var invuln = this.player.isInvulnerable || this.player.isDashing;
+            this.debugHpText.setText('HP: ' + currentHp + '/' + maxHp + ' | XP: ' + this.xpCurrency + ' | Invuln: ' + invuln);
             // Color based on HP
             if (currentHp <= maxHp * 0.25) {
                 this.debugHpText.setColor('#ff4444');
@@ -838,6 +879,19 @@ class GameScene extends Phaser.Scene {
                 this.debugHpText.setColor('#ffff44');
             } else {
                 this.debugHpText.setColor('#44ff44');
+            }
+        }
+        
+        // Update active upgrades display
+        if (this.debugUpgradesText && this.upgradeManager) {
+            var acquired = this.upgradeManager.getAcquiredList();
+            if (acquired.length > 0) {
+                var upgradeStr = acquired.map(function(u) { 
+                    return u.icon + u.currentLevel; 
+                }).join(' ');
+                this.debugUpgradesText.setText('Upgrades: ' + upgradeStr);
+            } else {
+                this.debugUpgradesText.setText('Upgrades: none');
             }
         }
     }
@@ -914,8 +968,9 @@ class GameScene extends Phaser.Scene {
         
         debugInfo += '\nTarget dist: ' + (nearest ? Math.round(nearestDist) : 'none');
         debugInfo += '\nEnemies: ' + this.enemyObjects.filter(function(e) { return e.active; }).length;
+        debugInfo += '\nEnemy bullets: ' + this.enemyProjectileObjects.length;
         debugInfo += '\nPlayer HP: ' + Math.round(this.player.hp);
-        debugInfo += '\nInvuln: ' + this.player.isInvulnerable;
+        debugInfo += '\nInvuln: ' + (this.player.isInvulnerable || this.player.isDashing);
         
         this.debugText.setText(debugInfo);
     }
@@ -1043,10 +1098,12 @@ class GameScene extends Phaser.Scene {
     }
     
     createEnemyProjectile(x, y, angle, damage, speed) {
-        const projectile = new Projectile(this, x, y, angle, speed, damage, true);
+        var projectile = new Projectile(this, x, y, angle, speed, damage, true);
         
         this.enemyProjectiles.add(projectile.graphics);
         this.enemyProjectileObjects.push(projectile);
+        
+        console.log('Enemy projectile created at', Math.round(x), Math.round(y), 'dmg:', damage, 'total:', this.enemyProjectileObjects.length);
     }
     
     createDamageNumber(x, y, amount, isCrit) {
@@ -1080,8 +1137,14 @@ class GameScene extends Phaser.Scene {
     
     handlePickupCollected(pickup) {
         if (pickup.type === 'xp') {
-            const xpMult = this.upgradeManager.stats.xpGainMultiplier || 1;
-            this.xp += pickup.value * xpMult;
+            var xpMult = this.upgradeManager.stats.xpGainMultiplier || 1;
+            var xpGained = Math.round(pickup.value * xpMult);
+            
+            // Add to XP currency (for upgrades)
+            this.xpCurrency += xpGained;
+            
+            // Also add to level XP
+            this.xp += xpGained;
             
             // Level up check
             while (this.xp >= this.xpToNextLevel) {
@@ -1140,6 +1203,11 @@ class GameScene extends Phaser.Scene {
         this.spawnInterval = 2000;
         this.lastSpawnTime = 0;
         this.isIntermission = false;
+        
+        // Give starting XP on wave 1 so players can test upgrades
+        if (this.wave === 1) {
+            this.xpCurrency = 15; // Enough for 1 common upgrade
+        }
         
         // Boss wave every 5 waves
         if (this.wave % 5 === 0) {
@@ -1206,21 +1274,29 @@ class GameScene extends Phaser.Scene {
         // Reset rerolls for this intermission
         this.upgradeManager.resetRerolls();
         
-        // Show upgrade selection
-        console.log('Showing upgrade selection UI');
-        const choices = this.upgradeManager.getRandomChoices(3);
+        // Show upgrade selection with XP currency system
+        console.log('Showing upgrade selection UI, XP currency:', this.xpCurrency);
+        var choices = this.upgradeManager.getRandomChoices(3);
         var self = this;
-        this.upgradeUI.show(choices, this.upgradeManager, function(upgrade) {
-            console.log('Upgrade callback received:', upgrade.id, upgrade.name);
+        
+        // Pass scene reference for XP access
+        this.upgradeUI.show(choices, this.upgradeManager, this, function(upgrade, cost) {
+            console.log('Upgrade callback received:', upgrade ? upgrade.id : 'SKIP', 'cost:', cost);
             
-            // Apply the upgrade
-            self.upgradeManager.applyUpgrade(upgrade.id);
-            console.log('Upgrade applied:', upgrade.id);
-            
-            // Update player max HP if needed
-            var stats = self.upgradeManager.stats;
-            if (stats.maxHp > self.player.maxHp) {
-                self.player.maxHp = stats.maxHp;
+            if (upgrade) {
+                // Deduct XP cost
+                self.xpCurrency -= cost;
+                console.log('XP deducted:', cost, 'remaining:', self.xpCurrency);
+                
+                // Apply the upgrade
+                self.upgradeManager.applyUpgrade(upgrade.id);
+                console.log('Upgrade applied:', upgrade.id);
+                
+                // Update player max HP if needed
+                var stats = self.upgradeManager.stats;
+                if (stats.maxHp > self.player.maxHp) {
+                    self.player.maxHp = stats.maxHp;
+                }
             }
             
             // Resume gameplay - start next wave
